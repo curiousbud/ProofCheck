@@ -1,0 +1,2 @@
+[console_scripts]
+proofcheck = proofcheck.cli:main
