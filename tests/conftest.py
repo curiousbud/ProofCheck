@@ -46,6 +46,9 @@ def _isolated_db(tmp_path, monkeypatch):
     unaffected; tests that exercise auth opt in by setting the env var themselves.
     """
     monkeypatch.setenv("PROOFCHECK_DB", str(tmp_path / "proofcheck.db"))
+    # Isolate the content-addressed OCR cache per test too, so cache hits/misses are
+    # deterministic and don't leak between tests.
+    monkeypatch.setenv("PROOFCHECK_OCR_CACHE", str(tmp_path / "ocr_cache"))
     from proofcheck.web import store
     store.init_db()
     yield

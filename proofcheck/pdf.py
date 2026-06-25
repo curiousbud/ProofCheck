@@ -32,6 +32,8 @@ class PdfText:
     empty_pages: list[int] = field(default_factory=list)
     # 1-based page numbers whose text was recovered via OCR.
     ocr_pages: list[int] = field(default_factory=list)
+    # True when the OCR text was reused from cache (identical file seen before).
+    ocr_from_cache: bool = False
     # Set when OCR was requested but the engine/libraries were unavailable.
     ocr_unavailable_reason: str | None = None
     # Set when OCR was attempted but failed.
@@ -50,7 +52,13 @@ class PdfText:
         if self.ocr_error:
             msgs.append("OCR error: " + self.ocr_error)
         for p in self.ocr_pages:
-            msgs.append(f"Page {p} had no text layer — text recovered via OCR.")
+            if self.ocr_from_cache:
+                msgs.append(
+                    f"Page {p} had no text layer — reused OCR text from an earlier run of "
+                    f"this identical file (file unchanged, so OCR was skipped)."
+                )
+            else:
+                msgs.append(f"Page {p} had no text layer — text recovered via OCR.")
         for p in self.empty_pages:
             msgs.append(f"Page {p} has no text layer — OCR required, skipped.")
         return msgs
@@ -90,20 +98,32 @@ def extract(
 def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
 
+    Uses the content-addressed OCR cache first: an identical file (same bytes, dpi, lang)
+    reuses its previous OCR text with no re-OCR — and doesn't even need the engine. Only a
+    new/changed file (different content hash) is OCR'd fresh, then cached.
+
     Never raises: any unavailability/failure is recorded on the result as a warning so a
     run still completes deterministically on whatever text could be extracted.
     """
-    from . import ocr as ocr_mod
+    from . import ocr as ocr_mod, ocr_cache
 
-    if not ocr_mod.available():
-        result.ocr_unavailable_reason = ocr_mod.unavailable_reason()
-        return
+    use_cache = ocr_cache.enabled()
+    digest = ocr_cache.file_sha256(path) if use_cache else None
+    recovered = ocr_cache.load(digest, dpi=dpi, lang=lang) if use_cache else None
 
-    try:
-        recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang)
-    except ocr_mod.OcrError as exc:
-        result.ocr_error = str(exc)
-        return
+    if recovered is not None:
+        result.ocr_from_cache = True  # cache hit: unchanged file, skip OCR entirely
+    else:
+        if not ocr_mod.available():
+            result.ocr_unavailable_reason = ocr_mod.unavailable_reason()
+            return
+        try:
+            recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang)
+        except ocr_mod.OcrError as exc:
+            result.ocr_error = str(exc)
+            return
+        if use_cache and digest is not None:
+            ocr_cache.store(digest, dpi=dpi, lang=lang, pages=recovered)
 
     still_empty: list[int] = []
     for p in result.empty_pages:

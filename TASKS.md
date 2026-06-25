@@ -11,12 +11,15 @@ HTML / xlsx reports plus a swappable web UI.
 - [x] `excel.py` — load workbook, inspect sheets/headers, read column values per row
 - [x] `pdf.py` — per-page text extraction, detect pages with no text layer (warnings), **optional OCR fallback**
 - [x] `ocr.py` — **optional, deterministic Tesseract OCR** for no-text-layer (scanned) pages; graceful no-op when absent
+- [x] `ocr_cache.py` — **content-addressed OCR cache** (sha256 of file + dpi + lang); unchanged file = cache hit (no re-OCR), changed file = fresh OCR
+- [x] `humanize.py` — **plain-language wording** for reports (Found / Found-with-differences / Not-found / Blank); presentation only
 - [x] `matcher.py` — exact / fuzzy / missing / skipped matching + `[op,text]` diff (difflib)
 - [x] `pipeline.py` — **shared orchestration** `run(RunConfig) -> RunResult` (CLI + web call this, no duplication)
 
-## Reports
-- [x] `report_html.py` — standalone HTML report from `RunResult` (status colors, diff highlighting)
-- [x] `report_xlsx.py` — xlsx report from `RunResult` (summary + per-column sheets, color-coded)
+## Reports (human-readable for non-technical readers)
+- [x] `report_html.py` — standalone HTML report: plain-English overview + legend, per-row "what we found", diff highlighting
+- [x] `report_xlsx.py` — xlsx report: friendly Summary sheet + per-column sheets ("Found"/"Not found"/…), color-coded
+- [x] Web UI results use the same plain-language wording (shared `humanize.py` vocabulary, JS twin in `app.js`)
 
 ## CLI (thin wrapper)
 - [x] `cli.py` — `check` (parse args -> `RunConfig` -> `pipeline.run()` -> report writers)

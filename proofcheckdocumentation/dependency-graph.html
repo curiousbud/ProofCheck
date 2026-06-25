@@ -97,6 +97,8 @@ const NODES = [
   { id:"excel.py",         doc:"docs/excel_EXPLAINED.md",             kind:"leaf",   col:0, label:"excel.py",         sub:"openpyxl load" },
   { id:"pdf.py",           doc:"docs/pdf_EXPLAINED.md",               kind:"leaf",   col:0, label:"pdf.py",           sub:"pdfplumber text" },
   { id:"ocr.py",           doc:"docs/ocr_EXPLAINED.md",               kind:"leaf",   col:0, label:"ocr.py",           sub:"OCR fallback (opt)" },
+  { id:"ocr_cache.py",     doc:"docs/ocr_cache_EXPLAINED.md",         kind:"leaf",   col:0, label:"ocr_cache.py",     sub:"OCR cache (sha256)" },
+  { id:"humanize.py",      doc:"docs/humanize_EXPLAINED.md",          kind:"leaf",   col:0, label:"humanize.py",      sub:"plain-language wording" },
   { id:"__init__.py",      doc:"docs/proofcheck_init_EXPLAINED.md",   kind:"leaf",   col:0, label:"__init__.py",      sub:"version marker" },
   { id:"web/schemas.py",   doc:"docs/web_schemas_EXPLAINED.md",       kind:"schema", col:0, label:"web/schemas.py",   sub:"SWAP CONTRACT" },
   { id:"web/store.py",     doc:"docs/web_store_EXPLAINED.md",         kind:"leaf",   col:0, label:"web/store.py",     sub:"sqlite users/runs" },
@@ -136,6 +138,9 @@ const EDGES = [
   { from:"pipeline.py",    to:"matcher.py" },
   { from:"pipeline.py",    to:"models.py" },
   { from:"pdf.py",         to:"ocr.py", kind:"lazy" },            // OCR fallback imported inside _apply_ocr
+  { from:"pdf.py",         to:"ocr_cache.py", kind:"lazy" },      // cache consulted inside _apply_ocr
+  { from:"report_html.py", to:"humanize.py" },
+  { from:"report_xlsx.py", to:"humanize.py" },
   { from:"web/auth.py",    to:"web/store.py" },
   { from:"cli.py",         to:"pipeline.py" },
   { from:"cli.py",         to:"excel.py" },

@@ -117,3 +117,8 @@ Error handling: a `PdfError` raised inside is re-raised unchanged (`except PdfEr
 
 `extract()` now takes `ocr`/`ocr_dpi`/`ocr_lang`. When `ocr=True` and pages have no text layer, `_apply_ocr` lazily imports `proofcheck.ocr` and recovers them. `PdfText` gained `ocr_pages`, `ocr_unavailable_reason`, and `ocr_error` fields; `warnings()` now reports OCR-recovered pages and any OCR unavailability/error. OCR never raises into a run -- failures are recorded as warnings, preserving determinism. See ocr_EXPLAINED.md.
 
+
+## v0.2 changes (continued)
+
+`PdfText` gained `ocr_from_cache`. `_apply_ocr` now consults `ocr_cache` first (keyed by sha256 of the file + dpi + lang): an identical file reuses cached OCR text with no re-OCR and without even needing the engine; a changed file (different hash) is OCR'd fresh and stored. `warnings()` distinguishes cache reuse ('file unchanged') from fresh OCR. See ocr_cache_EXPLAINED.md.
+

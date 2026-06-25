@@ -119,3 +119,8 @@ Session-scoped. Draws each `PDF_LINES` entry on page 1 at x=72, starting y=720 a
 
 Added an autouse `_isolated_db` fixture that points `PROOFCHECK_DB` at a per-test throwaway SQLite file (and calls `store.init_db()`), isolating users/history between tests. Auth stays disabled by default; auth tests opt in via `PROOFCHECK_AUTH`.
 
+
+## v0.2 changes (continued)
+
+The `_isolated_db` fixture also sets `PROOFCHECK_OCR_CACHE` to a per-test temp directory, so OCR cache hits/misses are deterministic and never leak between tests.
+

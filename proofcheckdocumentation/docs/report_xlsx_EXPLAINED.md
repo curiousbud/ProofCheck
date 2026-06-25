@@ -183,3 +183,8 @@ Builds the workbook and saves it to `path` via openpyxl's `Workbook.save`. This 
 - **Sheet-title rules:** Excel caps sheet titles at 31 characters (handled by `col.name[:31]`) and an empty title is invalid (handled by the `or "Column"` fallback). The forbidden-character set (`[ ] : * ? / \`) mentioned in the comment is not stripped, so an unusual column name could still cause openpyxl to error.
 - **Autosize is capped:** `_autosize` limits any column to `max_width` (60) characters so a long diff or PDF snippet does not produce an unusably wide column; it also adds +2 padding and skips empty cells.
 - **`build` vs `write`:** `build` returns an in-memory `Workbook` (useful for testing or streaming), while `write` is the convenience wrapper that builds and saves.
+
+## v0.2 changes (continued)
+
+Rewritten for readability. The Summary sheet leads with `humanize.summary_sentence` and friendly counts (Found / Found with differences / Not found / Blank / Match rate); each per-column sheet is Row | Value in your spreadsheet | Result | Details, with the Result cell color-coded and the Details cell wrapped. The raw Diff/Score columns are gone (the % similar is folded into the plain-English Details). Depends on humanize.py.
+

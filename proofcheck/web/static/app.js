@@ -233,36 +233,78 @@ function wireCheck() {
   }
 }
 
+// Plain-language mapping, mirroring proofcheck/humanize.py (presentation only — the API
+// still uses EXACT/FUZZY/MISSING/SKIPPED).
+const HUMAN = {
+  EXACT:   { label: "Found",                  icon: "✓", meaning: "Found in the PDF exactly." },
+  FUZZY:   { label: "Found with differences", icon: "≈", meaning: "Found, but not an exact match — check the highlighted differences." },
+  MISSING: { label: "Not found",              icon: "✗", meaning: "This value could not be found in the PDF." },
+  SKIPPED: { label: "Blank",                  icon: "–", meaning: "The spreadsheet cell was empty, so there was nothing to check." },
+};
+
+function summarySentence(s) {
+  const checked = s.total - s.skipped;
+  const parts = [];
+  if (s.exact) parts.push(`${s.exact} found`);
+  if (s.fuzzy) parts.push(`${s.fuzzy} found with small differences`);
+  if (s.missing) parts.push(`${s.missing} not found`);
+  const body = parts.length ? parts.join("; ") : "nothing needed checking";
+  let out = `We checked ${checked} value${checked === 1 ? "" : "s"} from your spreadsheet against the PDF: ${body}.`;
+  if (s.skipped) out += ` ${s.skipped} blank cell${s.skipped === 1 ? " was" : "s were"} skipped.`;
+  return out;
+}
+
+function detailText(r) {
+  const where = r.page == null ? "the PDF" : `page ${r.page}`;
+  if (r.status === "EXACT") return `Found on ${where}.`;
+  if (r.status === "FUZZY")
+    return `Found on ${where}, but not an exact match. Your spreadsheet has “${r.expected}”; ` +
+           `the PDF shows “${r.best_match || ""}” (${r.score}% similar).`;
+  if (r.status === "MISSING")
+    return r.best_match
+      ? `Not found in the PDF. The closest text was “${r.best_match}” on ${where}, ` +
+        `but it was too different (${r.score}% similar).`
+      : "Not found anywhere in the PDF.";
+  return "The spreadsheet cell was empty, so there was nothing to check.";
+}
+
 function renderResults(data) {
-  const card = (l, v) => `<div class="card"><div class="n">${v}</div><div class="l">${l}</div></div>`;
+  const card = (l, v) => `<div class="card"><div class="n">${v}</div><div class="l">${esc(l)}</div></div>`;
   const s = data.summary;
   const results = document.getElementById("results");
   results.classList.remove("hidden");
+  const legend = ["EXACT", "FUZZY", "MISSING", "SKIPPED"].map((st) =>
+    `<li><span class="badge b-${st}">${HUMAN[st].icon} ${esc(HUMAN[st].label)}</span> — ${esc(HUMAN[st].meaning)}</li>`
+  ).join("");
   results.innerHTML = `
     <div class="panel">
+      <p class="lead">${esc(summarySentence(s))}</p>
       <div class="cards">
-        ${card("Total", s.total)}${card("Exact", s.exact)}${card("Fuzzy", s.fuzzy)}
-        ${card("Missing", s.missing)}${card("Skipped", s.skipped)}
-        ${card("Pass rate", (s.pass_rate * 100).toFixed(1) + "%")}
+        ${card("Values checked", s.total - s.skipped)}${card("Found", s.exact)}
+        ${card("Found w/ differences", s.fuzzy)}${card("Not found", s.missing)}
+        ${card("Blank", s.skipped)}${card("Match rate", (s.pass_rate * 100).toFixed(0) + "%")}
       </div>
       ${data.warnings && data.warnings.length
-        ? `<div class="banner" style="margin-top:1rem;"><b>Warnings</b><ul>${data.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>`
+        ? `<div class="banner" style="margin-top:1rem;"><b>Notes</b><ul>${data.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>`
         : ""}
+      <details class="legend"><summary>How to read these results</summary>
+        <ul>${legend}<li class="muted">In the differences below, <del>red struck-through</del> text is in your spreadsheet but not the PDF; <ins>green</ins> text is in the PDF but not your spreadsheet.</li></ul>
+      </details>
       <div style="margin-top:1rem;">
-        <a class="report" href="${esc(data.report_urls.html)}" target="_blank">Download HTML report</a> &nbsp;
-        <a class="report" href="${esc(data.report_urls.xlsx)}">Download xlsx report</a>
+        <a class="report" href="${esc(data.report_urls.html)}" target="_blank">Download printable report</a> &nbsp;
+        <a class="report" href="${esc(data.report_urls.xlsx)}">Download Excel report</a>
       </div>
     </div>
     <div class="panel">
       <div class="toolbar">
-        <label>Filter:
+        <label>Show:
           <select id="statusFilter">
-            <option value="">All</option><option value="EXACT">Exact</option>
-            <option value="FUZZY">Fuzzy</option><option value="MISSING">Missing</option>
-            <option value="SKIPPED">Skipped</option>
+            <option value="">All results</option><option value="EXACT">Found</option>
+            <option value="FUZZY">Found with differences</option><option value="MISSING">Not found</option>
+            <option value="SKIPPED">Blank</option>
           </select>
         </label>
-        <input type="search" id="search" placeholder="Search expected / match…">
+        <input type="search" id="search" placeholder="Search values…">
       </div>
       <div id="tables"></div>
     </div>`;
@@ -287,15 +329,20 @@ function renderTables() {
     if (!rows.length) return;
     container.appendChild(el("h3", {}, col.name));
     const table = el("table", { html:
-      "<thead><tr><th>Row</th><th>Status</th><th>Expected</th><th>Best match / diff</th><th>Page</th><th>Score</th></tr></thead><tbody>" +
-      rows.map((r) =>
-        `<tr><td>${r.row}</td><td><span class="badge b-${r.status}">${r.status}</span></td>` +
-        `<td>${esc(r.expected)}</td><td>${diffHtml(r.diff, r.best_match)}</td>` +
-        `<td>${r.page == null ? "" : r.page}</td><td>${r.score}</td></tr>`
-      ).join("") + "</tbody>" });
+      "<thead><tr><th>Row</th><th>Value in your spreadsheet</th><th>Result</th><th>Details</th></tr></thead><tbody>" +
+      rows.map((r) => {
+        let details = esc(detailText(r));
+        if (r.status === "FUZZY" && r.diff && r.diff.length) {
+          details += `<div class="diffline"><span class="muted">Difference:</span> ${diffHtml(r.diff, r.best_match)}</div>`;
+        }
+        const value = esc(r.expected) || '<span class="muted">(empty)</span>';
+        return `<tr><td>${r.row}</td><td>${value}</td>` +
+          `<td><span class="badge b-${r.status}">${HUMAN[r.status].icon} ${esc(HUMAN[r.status].label)}</span></td>` +
+          `<td>${details}</td></tr>`;
+      }).join("") + "</tbody>" });
     container.appendChild(table);
   });
-  if (!container.innerHTML) container.innerHTML = '<p class="muted">No rows match the current filter.</p>';
+  if (!container.innerHTML) container.innerHTML = '<p class="muted">No results match the current filter.</p>';
 }
 
 // ---- History views ----------------------------------------------------------
@@ -317,7 +364,8 @@ function renderHistory(runs) {
   panel.innerHTML = "<h2>Run history</h2>";
   if (!runs.length) { panel.appendChild(el("p", { class: "muted" }, "No runs yet. Run a check to see it here.")); return; }
   const table = el("table", { html:
-    "<thead><tr><th>When</th><th>Excel</th><th>PDF</th><th>Pass</th><th>Exact</th><th>Fuzzy</th><th>Missing</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>When</th><th>Spreadsheet</th><th>PDF</th><th>Match rate</th>" +
+    "<th>Found</th><th>With differences</th><th>Not found</th><th></th></tr></thead><tbody>" +
     runs.map((r) =>
       `<tr class="history-row" data-id="${esc(r.run_id)}">
         <td>${esc(r.created_at)}</td><td>${esc(r.excel)}</td><td>${esc(r.pdf)}</td>
@@ -356,13 +404,13 @@ async function historyDetailView(id) {
       <p class="muted">${esc(r.created_at)} · threshold ${r.meta.fuzzy_threshold}
         ${flags.length ? "· flags: " + flags.map(esc).join(", ") : ""}</p>
       <div class="cards">
-        ${card("Total", r.summary.total)}${card("Exact", r.summary.exact)}${card("Fuzzy", r.summary.fuzzy)}
-        ${card("Missing", r.summary.missing)}${card("Skipped", r.summary.skipped)}
-        ${card("Pass rate", (r.summary.pass_rate * 100).toFixed(1) + "%")}
+        ${card("Values checked", r.summary.total - r.summary.skipped)}${card("Found", r.summary.exact)}
+        ${card("With differences", r.summary.fuzzy)}${card("Not found", r.summary.missing)}
+        ${card("Blank", r.summary.skipped)}${card("Match rate", (r.summary.pass_rate * 100).toFixed(0) + "%")}
       </div>
       <div style="margin-top:1rem;">
-        <a class="report" href="/reports/${esc(r.run_id)}.html" target="_blank">HTML report</a> &nbsp;
-        <a class="report" href="/reports/${esc(r.run_id)}.xlsx">xlsx report</a>
+        <a class="report" href="/reports/${esc(r.run_id)}.html" target="_blank">Printable report</a> &nbsp;
+        <a class="report" href="/reports/${esc(r.run_id)}.xlsx">Excel report</a>
         <span class="muted">(reports expire ~1h after the run; the summary above persists)</span>
       </div>`;
   } catch (e) {

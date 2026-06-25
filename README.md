@@ -45,14 +45,25 @@ All normalization is deterministic and applied to both sides before comparison:
   so the same image at the same DPI always yields the same text. It recovers real glyphs;
   it never *guesses*.
 - Tunable: **`--ocr-lang`** (e.g. `eng+ara`) and **`--ocr-dpi`** (default 300).
+- **Cached by content — never OCR the same file twice.** OCR text is cached keyed by a
+  SHA-256 of the file's bytes. Re-uploading the **same** PDF is a cache hit (no OCR, no
+  engine needed); a file whose data **changed** gets a different hash and is OCR'd fresh.
+  The content hash *is* the change detector. Disable with `PROOFCHECK_OCR_CACHE=off`.
 - **Graceful:** if the OCR libraries or the Tesseract binary aren't present, OCR just stays
   off and pages fall back to warn-and-skip — a run never crashes. The web `/api/health`
   endpoint and the UI's "OCR ready / not installed" pill reflect availability.
 
-### Reports
-- **Standalone HTML report** — self-contained, color-coded by status, with diff highlighting.
-- **xlsx report** — a summary sheet plus per-column sheets, color-coded.
-- Both are generated from the same result and offered as downloads from the CLI and web UI.
+### Reports (written for non-technical readers)
+- **Plain language everywhere.** The web results, the printable HTML report, and the Excel
+  report all use ordinary words instead of jargon: **Found** / **Found with differences** /
+  **Not found** / **Blank** (no `EXACT`/`FUZZY`/`MISSING`/`SKIPPED`, no raw scores).
+- Each report opens with a one-sentence overview ("We checked 12 values… 9 found, 2 with
+  small differences, 1 not found") and a short "how to read this" legend.
+- Every row explains itself in English — where the value was found, the exact text in the
+  PDF, and a highlighted difference (red = removed, green = added) when it isn't an exact match.
+- **Standalone HTML report** — self-contained, printable, color-coded.
+- **Excel (.xlsx) report** — a Summary sheet plus one friendly sheet per checked column.
+- All three views are generated from the same result, so they always agree.
 
 ### Command-line interface
 - **`proofcheck inspect`** — list a workbook's sheets and column headers.
@@ -95,7 +106,7 @@ All normalization is deterministic and applied to both sides before comparison:
   JSON contract (`web/schemas.py`).
 - **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
   create a virtualenv, install the package, and run the tests in one command.
-- **Deterministic test suite** (49 tests) with fixtures generated on the fly — no committed
+- **Deterministic test suite** (52 tests) with fixtures generated on the fly — no committed
   binaries. OCR tests pass with or without the engine installed.
 
 ---
@@ -337,7 +348,7 @@ Full per-file deep-dives live in [`proofcheckdocumentation/`](proofcheckdocument
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 49 tests
+pytest          # 52 tests
 ```
 
 OCR tests cover both the real graceful-degradation path and a monkeypatched recovery path,

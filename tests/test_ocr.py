@@ -7,7 +7,7 @@ monkeypatched success path that exercises the wiring without needing the engine.
 
 from __future__ import annotations
 
-from proofcheck import ocr, pdf
+from proofcheck import ocr, ocr_cache, pdf
 from proofcheck.models import RunConfig, Status
 from proofcheck.pipeline import run
 
@@ -69,6 +69,64 @@ def test_ocr_error_is_recorded_not_raised(pdf_path, monkeypatch):
     result = pdf.extract(pdf_path, ocr=True)
     assert result.ocr_error == "render exploded"
     assert 2 in result.empty_pages  # unchanged; we never lose determinism on failure
+
+
+def test_ocr_cache_skips_reocr_on_unchanged_file(pdf_path, monkeypatch):
+    calls = {"n": 0}
+
+    def counting_ocr(path, pages, **kw):
+        calls["n"] += 1
+        return {p: "Recovered Delegate Text" for p in pages}
+
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "ocr_pages", counting_ocr)
+
+    first = pdf.extract(pdf_path, ocr=True)
+    assert calls["n"] == 1 and first.ocr_pages == [2] and first.ocr_from_cache is False
+
+    # Same file again -> cache hit -> OCR engine is NOT called a second time.
+    second = pdf.extract(pdf_path, ocr=True)
+    assert calls["n"] == 1                      # no re-OCR
+    assert second.ocr_from_cache is True
+    assert second.pages[2] == first.pages[2]    # identical recovered text
+    assert any("file unchanged" in w for w in second.warnings())
+
+
+def test_ocr_cache_misses_when_content_changes(pdf_path, tmp_path, monkeypatch):
+    calls = {"n": 0}
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "ocr_pages",
+                        lambda path, pages, **kw: (calls.__setitem__("n", calls["n"] + 1)
+                                                   or {p: "text" for p in pages}))
+    pdf.extract(pdf_path, ocr=True)
+    assert calls["n"] == 1
+
+    # A different (but valid) PDF hashes differently -> cache miss -> OCR runs again.
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    changed = tmp_path / "changed.pdf"
+    c = canvas.Canvas(str(changed), pagesize=letter)
+    c.drawString(72, 720, "A completely different first page")
+    c.showPage()
+    c.rect(72, 600, 200, 100, stroke=1, fill=0)  # page 2: no text layer -> needs OCR
+    c.showPage()
+    c.save()
+    pdf.extract(str(changed), ocr=True)
+    assert calls["n"] == 2
+
+
+def test_ocr_cache_can_be_disabled(pdf_path, monkeypatch):
+    monkeypatch.setenv("PROOFCHECK_OCR_CACHE", "off")
+    assert ocr_cache.enabled() is False
+    calls = {"n": 0}
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "ocr_pages",
+                        lambda path, pages, **kw: (calls.__setitem__("n", calls["n"] + 1)
+                                                   or {p: "text" for p in pages}))
+    pdf.extract(pdf_path, ocr=True)
+    pdf.extract(pdf_path, ocr=True)
+    assert calls["n"] == 2  # no caching -> OCR runs every time
 
 
 def test_pipeline_ocr_flag_recorded_in_meta(excel_path, pdf_path):

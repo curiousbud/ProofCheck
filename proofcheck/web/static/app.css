@@ -51,6 +51,12 @@ a.report, a.rowlink { color:var(--link); }
 .pill { font-size:.7rem; padding:.1rem .4rem; border:1px solid var(--border); border-radius:999px; color:var(--muted); }
 .history-row td { cursor:pointer; }
 .history-row:hover td { background:#f3f7ff; }
+.lead { font-size:1.02rem; background:#f3f7ff; border:1px solid #cfe0ff; border-radius:8px; padding:.75rem .9rem; margin:0 0 1rem; }
+.legend { margin-top:1rem; font-size:.9rem; }
+.legend summary { cursor:pointer; font-weight:600; color:var(--muted); }
+.legend ul { margin:.5rem 0 0; padding-left:1.1rem; } .legend li { margin:.25rem 0; }
+.legend .badge { margin-right:.25rem; }
+.diffline { margin-top:.35rem; font-size:.92rem; }
 .auth-wrap { max-width:380px; margin:3rem auto; }
 .danger { background:none; border:0; color:var(--missing); cursor:pointer; font-size:.8rem; }
 .danger:hover { text-decoration:underline; }

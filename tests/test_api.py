@@ -73,7 +73,7 @@ def test_check_returns_documented_shape_and_counts(excel_path, pdf_path):
 
     html_res = client.get(data["report_urls"]["html"])
     assert html_res.status_code == 200
-    assert "ProofCheck report" in html_res.text
+    assert "ProofCheck results" in html_res.text
 
 
 def test_bad_extension_returns_400(excel_path, pdf_path):

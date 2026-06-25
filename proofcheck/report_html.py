@@ -1,13 +1,16 @@
-"""Standalone HTML report generated from a :class:`RunResult`.
+"""Standalone, human-readable HTML report generated from a :class:`RunResult`.
 
-Self-contained (inline CSS, no CDNs, offline). Status colors match the web UI and
-the xlsx report: green EXACT, amber FUZZY, red MISSING, grey SKIPPED.
+Self-contained (inline CSS, no CDNs, offline). Written for non-technical readers: a plain
+one-sentence overview, a "how to read this" legend, and per-row results in everyday
+language ("Found", "Found with differences", "Not found", "Blank") with the exact text we
+found and a highlighted difference. Status colors match the xlsx report and web UI.
 """
 
 from __future__ import annotations
 
 import html
 
+from . import humanize
 from .models import RunResult, Status
 
 _STATUS_CLASS = {
@@ -18,19 +21,26 @@ _STATUS_CLASS = {
 }
 
 _CSS = """
-body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; color: #1a1a1a; }
-h1 { margin-bottom: .25rem; } .meta { color: #666; font-size: .85rem; margin-bottom: 1.5rem; }
-.cards { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-.card { border: 1px solid #ddd; border-radius: 8px; padding: .75rem 1rem; min-width: 90px; }
-.card .n { font-size: 1.6rem; font-weight: 700; } .card .l { font-size: .75rem; color: #666; text-transform: uppercase; }
+body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; color: #1a1a1a; line-height: 1.45; }
+h1 { margin-bottom: .25rem; } h2 { margin-top: 2rem; }
+.meta { color: #666; font-size: .85rem; margin-bottom: 1rem; }
+.lead { font-size: 1.05rem; background: #f3f7ff; border: 1px solid #cfe0ff; border-radius: 8px; padding: .9rem 1.1rem; margin: 1rem 0 1.25rem; }
+.cards { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.card { border: 1px solid #ddd; border-radius: 8px; padding: .6rem 1rem; min-width: 110px; }
+.card .n { font-size: 1.6rem; font-weight: 700; } .card .l { font-size: .75rem; color: #666; }
+.legend { border: 1px solid #e3e3e3; border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1.5rem; font-size: .9rem; }
+.legend ul { margin: .4rem 0 0; padding-left: 1.1rem; } .legend li { margin: .15rem 0; }
 .warn { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1.5rem; }
-table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; font-size: .9rem; }
-th, td { border: 1px solid #e3e3e3; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; font-size: .9rem; }
+th, td { border: 1px solid #e3e3e3; padding: .5rem .6rem; text-align: left; vertical-align: top; }
 th { background: #f5f5f5; }
-.badge { font-weight: 700; font-size: .75rem; padding: .1rem .45rem; border-radius: 4px; color: #fff; }
+.badge { display: inline-block; font-weight: 700; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; color: #fff; white-space: nowrap; }
 .exact { background: #2e7d32; } .fuzzy { background: #f59e0b; } .missing { background: #c62828; }
 .skipped { background: #9e9e9e; }
+.detail { color: #333; } .diffline { margin-top: .35rem; font-size: .88rem; }
+.diffline .lbl { color: #666; }
 del { background: #ffd7d5; text-decoration: line-through; } ins { background: #d7f5dd; text-decoration: none; }
+.muted { color: #777; }
 """
 
 
@@ -44,7 +54,7 @@ def _diff_html(diff: list[tuple[str, str]]) -> str:
             out.append(f"<del>{t}</del>")
         elif op == "insert":
             out.append(f"<ins>{t}</ins>")
-        else:  # replace (reserved) — render both sides defensively
+        else:  # replace (reserved) — render defensively
             out.append(f"<del>{t}</del>")
     return "".join(out)
 
@@ -54,44 +64,62 @@ def render(result: RunResult) -> str:
     s = result.summary
     e = html.escape
     cards = [
-        ("Total", s.total), ("Exact", s.exact), ("Fuzzy", s.fuzzy),
-        ("Missing", s.missing), ("Skipped", s.skipped),
-        ("Pass rate", f"{s.pass_rate * 100:.1f}%"),
+        ("Values checked", s.total - s.skipped),
+        ("Found", s.exact),
+        ("Found with differences", s.fuzzy),
+        ("Not found", s.missing),
+        ("Blank", s.skipped),
+        ("Match rate", f"{s.pass_rate * 100:.0f}%"),
     ]
     parts: list[str] = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         "<meta name='viewport' content='width=device-width, initial-scale=1'>",
-        "<title>ProofCheck report</title>",
+        "<title>ProofCheck results</title>",
         f"<style>{_CSS}</style></head><body>",
-        "<h1>ProofCheck report</h1>",
-        (f"<div class='meta'>Excel: <b>{e(result.meta.excel)}</b> &nbsp; "
-         f"PDF: <b>{e(result.meta.pdf)}</b> &nbsp; "
-         f"Threshold: {result.meta.fuzzy_threshold} &nbsp; "
-         f"{e(result.meta.timestamp)}</div>"),
+        "<h1>ProofCheck results</h1>",
+        (f"<div class='meta'>Spreadsheet: <b>{e(result.meta.excel)}</b> &nbsp;·&nbsp; "
+         f"PDF: <b>{e(result.meta.pdf)}</b> &nbsp;·&nbsp; {e(result.meta.timestamp)}</div>"),
+        f"<div class='lead'>{e(humanize.summary_sentence(result))}</div>",
         "<div class='cards'>",
     ]
-    for label, value in cards:
-        parts.append(f"<div class='card'><div class='n'>{value}</div><div class='l'>{label}</div></div>")
+    for label_text, value in cards:
+        parts.append(f"<div class='card'><div class='n'>{value}</div><div class='l'>{e(label_text)}</div></div>")
     parts.append("</div>")
 
+    # How-to-read legend.
+    parts.append("<div class='legend'><b>How to read this report</b><ul>")
+    for status in (Status.EXACT, Status.FUZZY, Status.MISSING, Status.SKIPPED):
+        cls = _STATUS_CLASS[status]
+        parts.append(
+            f"<li><span class='badge {cls}'>{humanize.icon(status)} {e(humanize.label(status))}</span> "
+            f"— {e(humanize.meaning(status))}</li>"
+        )
+    parts.append(
+        "<li class='muted'>In the differences, <del>red struck-through</del> text is in your "
+        "spreadsheet but not the PDF, and <ins>green</ins> text is in the PDF but not your "
+        "spreadsheet.</li>"
+    )
+    parts.append("</ul></div>")
+
     if result.warnings:
-        parts.append("<div class='warn'><b>Warnings</b><ul>")
+        parts.append("<div class='warn'><b>Notes</b><ul>")
         parts.extend(f"<li>{e(w)}</li>" for w in result.warnings)
         parts.append("</ul></div>")
 
     for col in result.columns:
         parts.append(f"<h2>{e(col.name)}</h2>")
-        parts.append("<table><thead><tr><th>Row</th><th>Status</th><th>Expected</th>"
-                     "<th>Best match / diff</th><th>Page</th><th>Score</th></tr></thead><tbody>")
+        parts.append("<table><thead><tr><th>Row</th><th>Value in your spreadsheet</th>"
+                     "<th>Result</th><th>Details</th></tr></thead><tbody>")
         for r in col.results:
             cls = _STATUS_CLASS[r.status]
-            diff_cell = _diff_html(r.diff) if r.diff else e(r.best_match or "")
-            page = "" if r.page is None else r.page
+            badge = f"<span class='badge {cls}'>{humanize.icon(r.status)} {e(humanize.label(r.status))}</span>"
+            detail = f"<span class='detail'>{e(humanize.detail(r))}</span>"
+            if r.status is Status.FUZZY and r.diff:
+                detail += (f"<div class='diffline'><span class='lbl'>Difference:</span> "
+                           f"{_diff_html(r.diff)}</div>")
             parts.append(
-                f"<tr><td>{r.row}</td>"
-                f"<td><span class='badge {cls}'>{r.status.value}</span></td>"
-                f"<td>{e(r.expected)}</td><td>{diff_cell}</td>"
-                f"<td>{page}</td><td>{r.score}</td></tr>"
+                f"<tr><td>{r.row}</td><td>{e(r.expected) or '<span class=muted>(empty)</span>'}</td>"
+                f"<td>{badge}</td><td>{detail}</td></tr>"
             )
         parts.append("</tbody></table>")
 

@@ -182,3 +182,8 @@ Thin wrapper that renders the document and writes it to `path` as UTF-8 (matchin
 - **Diff representation differs by format:** HTML uses semantic `<del>`/`<ins>` tags with background colors; the xlsx report cannot hold inline markup and instead uses `[-deleted-]` / `{+inserted+}` text markers (`report_xlsx._flatten_diff`).
 - **`replace` op is reserved:** The model decomposes replacements into delete+insert, so the `else` branch in `_diff_html` should not normally fire; it defensively renders the text as a deletion rather than silently dropping it.
 - **Diff fallback:** When `r.diff` is empty, the "Best match / diff" cell falls back to the escaped `best_match`, so rows without a computed diff still display useful text.
+
+## v0.2 changes (continued)
+
+Rewritten for non-technical readers. Now opens with a one-sentence overview (`humanize.summary_sentence`) and a 'how to read this' legend; each row is explained in plain English (`humanize.detail`) with Found / Found-with-differences / Not-found / Blank badges instead of EXACT/FUZZY/etc. Table columns: Row | Value in your spreadsheet | Result | Details, with red=removed / green=added diff highlighting under fuzzy rows. Document title is now 'ProofCheck results'. Depends on humanize.py (see humanize_EXPLAINED.md).
+

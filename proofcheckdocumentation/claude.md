@@ -64,10 +64,12 @@ Proof-Reader/
 │   ├── excel.py                  · workbook load + inspect (openpyxl)
 │   ├── pdf.py                    · per-page text extraction; flags no-text-layer pages; optional OCR fallback
 │   ├── ocr.py                    · OPTIONAL deterministic Tesseract OCR for scanned pages (graceful no-op if absent)
+│   ├── ocr_cache.py              · content-addressed OCR cache (sha256) — never OCR the same file twice
 │   ├── matcher.py                · exact/fuzzy/missing/skipped + [op,text] diff   ← CORE LOGIC
 │   ├── pipeline.py               · run(RunConfig) -> RunResult                    ← SHARED ORCHESTRATION
-│   ├── report_html.py            · standalone HTML report from RunResult
-│   ├── report_xlsx.py            · xlsx report from RunResult
+│   ├── humanize.py               · plain-language labels/sentences for the reports (presentation only)
+│   ├── report_html.py            · standalone, human-readable HTML report from RunResult
+│   ├── report_xlsx.py            · human-readable xlsx report from RunResult
 │   ├── cli.py                    · thin click CLI: check / inspect / serve
 │   └── web/                      ← disposable web layer (zero business logic)
 │       ├── __init__.py
@@ -152,10 +154,12 @@ Each link is a line-by-line explainer (logic, functions, key variables, dependen
 | `proofcheck/excel.py` | [excel_EXPLAINED.md](docs/excel_EXPLAINED.md) | Excel load / inspect |
 | `proofcheck/pdf.py` | [pdf_EXPLAINED.md](docs/pdf_EXPLAINED.md) | PDF text extraction (+ optional OCR fallback) |
 | `proofcheck/ocr.py` | [ocr_EXPLAINED.md](docs/ocr_EXPLAINED.md) | Optional deterministic Tesseract OCR |
+| `proofcheck/ocr_cache.py` | [ocr_cache_EXPLAINED.md](docs/ocr_cache_EXPLAINED.md) | Content-addressed OCR cache (skip unchanged files) |
 | `proofcheck/matcher.py` | [matcher_EXPLAINED.md](docs/matcher_EXPLAINED.md) | Matching + diff (core logic) |
 | `proofcheck/pipeline.py` | [pipeline_EXPLAINED.md](docs/pipeline_EXPLAINED.md) | Shared orchestration |
-| `proofcheck/report_html.py` | [report_html_EXPLAINED.md](docs/report_html_EXPLAINED.md) | HTML report writer |
-| `proofcheck/report_xlsx.py` | [report_xlsx_EXPLAINED.md](docs/report_xlsx_EXPLAINED.md) | xlsx report writer |
+| `proofcheck/humanize.py` | [humanize_EXPLAINED.md](docs/humanize_EXPLAINED.md) | Plain-language report wording |
+| `proofcheck/report_html.py` | [report_html_EXPLAINED.md](docs/report_html_EXPLAINED.md) | Human-readable HTML report writer |
+| `proofcheck/report_xlsx.py` | [report_xlsx_EXPLAINED.md](docs/report_xlsx_EXPLAINED.md) | Human-readable xlsx report writer |
 | `proofcheck/cli.py` | [cli_EXPLAINED.md](docs/cli_EXPLAINED.md) | CLI (check/inspect/serve) |
 
 ### Web layer
@@ -194,10 +198,12 @@ the project's core contract.
 
 ### Current state (as of this guide)
 - Full core engine, CLI, web API + SPA, reports, and tests are implemented (v0.2.0).
-- **49 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
-- v0.2 added: **optional deterministic OCR** fallback (`ocr.py`), **diacritic folding**
-  (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), and **opt-in auth +
-  persistent run history** (`web/auth.py`, `web/store.py`, sqlite).
+- **52 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
+- v0.2 added: **optional deterministic OCR** fallback (`ocr.py`) with a **content-addressed
+  cache** (`ocr_cache.py`, never OCR an unchanged file twice), **diacritic folding**
+  (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), **opt-in auth +
+  persistent run history** (`web/auth.py`, `web/store.py`, sqlite), and **human-readable
+  reports** (`humanize.py` → HTML/xlsx/web all use Found / Found-with-differences / Not-found).
 - The repo currently has read-only remote access in the build environment, so the code
   may live only in commits / a downloaded zip. **Verify `git remote` / push rights before
   assuming you can push.**
@@ -244,6 +250,13 @@ PROOFCHECK_AUTH=on PROOFCHECK_ADMIN_USER=admin PROOFCHECK_ADMIN_PASSWORD=secret1
   `--ocr` (or the web checkbox) they are recovered via Tesseract — a fixed, offline glyph
   recogniser, NOT a learned/generative model — so same image + DPI → same text. If the OCR
   libs/binary are missing, it degrades to the old warn-and-skip behavior and never raises.
+- **OCR is cached by content** (`ocr_cache.py`): keyed by `sha256(file)+dpi+lang`, so an
+  unchanged file is never OCR'd twice and a changed file (different hash) is OCR'd fresh.
+  The cache is an optimization only — it returns exactly what OCR would have produced.
+- **Reports are human-readable** (`humanize.py` is the single source of truth). The data
+  contract keeps `EXACT/FUZZY/MISSING/SKIPPED`; the HTML/xlsx writers and the SPA map those
+  to Found / Found-with-differences / Not-found / Blank. If you add a status or change
+  wording, update `humanize.py` **and** the `HUMAN` map in `web/static/app.js` together.
 - **Auth is opt-in and stays out of the core.** All auth/history lives in `web/`; the CLI
   and `pipeline.run()` are untouched. Off by default → every request is the `anonymous`
   user, so the disposable single-user mode and the test-suite work with zero config.
