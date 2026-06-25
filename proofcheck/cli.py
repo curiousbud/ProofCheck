@@ -55,7 +55,13 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
 @click.option("--fuzzy-threshold", default=90, show_default=True, type=click.IntRange(0, 100))
 @click.option("--normalize-digits", is_flag=True, help="Fold unicode digits to ASCII.")
 @click.option("--strip-punctuation", is_flag=True, help="Ignore punctuation when matching.")
+@click.option("--fold-diacritics", is_flag=True,
+              help="Fold accents/diacritics so accented names match their unaccented form.")
 @click.option("--reverse", is_flag=True, help="Also try reversed word order (e.g. 'Last First').")
+@click.option("--ocr", is_flag=True, help="OCR pages with no text layer (needs the optional OCR extra).")
+@click.option("--ocr-dpi", default=300, show_default=True, type=click.IntRange(72, 1200),
+              help="Render DPI used for OCR.")
+@click.option("--ocr-lang", default="eng", show_default=True, help="Tesseract language(s), e.g. 'eng+ara'.")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
 @click.option("--xlsx", "xlsx_out", type=click.Path(dir_okay=False), help="Write an xlsx report here.")
 def check(
@@ -68,7 +74,11 @@ def check(
     fuzzy_threshold: int,
     normalize_digits: bool,
     strip_punctuation: bool,
+    fold_diacritics: bool,
     reverse: bool,
+    ocr: bool,
+    ocr_dpi: int,
+    ocr_lang: str,
     html_out: str | None,
     xlsx_out: str | None,
 ) -> None:
@@ -83,7 +93,11 @@ def check(
         fuzzy_threshold=fuzzy_threshold,
         normalize_digits=normalize_digits,
         strip_punctuation=strip_punctuation,
+        fold_diacritics=fold_diacritics,
         reverse=reverse,
+        ocr=ocr,
+        ocr_dpi=ocr_dpi,
+        ocr_lang=ocr_lang,
     )
     try:
         result = pipeline_run(config)

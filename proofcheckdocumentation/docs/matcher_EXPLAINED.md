@@ -213,3 +213,8 @@ The float best score is rounded to an int (or `0` if no page produced a score). 
 - **Alignment → snippet is approximate:** `_best_snippet` proportionally rescales normalized indices onto raw text; when normalization changes length the snippet bounds are an approximation, with a fallback to the normalized slice if the raw slice is empty.
 - **Normalization basis:** the score, the exact test, and the diff all operate on normalized text, so behavior depends on the `normalize_digits` / `strip_punctuation` flags; the displayed snippet, however, is raw.
 - **Comparison basis for diff:** the diff compares the normalized needle to the normalized snippet, not the raw strings, keeping it consistent with the score.
+
+## v0.2 changes
+
+`match_value` gained a `fold_diacritics` keyword, threaded into the `norm_kwargs` passed to `normalize()` for both the needle and each page haystack. No change to scoring/diff logic.
+

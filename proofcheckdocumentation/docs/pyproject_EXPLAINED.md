@@ -120,3 +120,8 @@ Configures pytest to collect tests from the `tests` directory by default, so a b
 - **`uvicorn[standard]`** pulls the standard extra (e.g., websockets/uvloop bits) for the ASGI server; `python-multipart` is mandatory for FastAPI file uploads even though tests never import it directly.
 - **package-data matters:** without `proofcheck.web = ["static/*"]`, an installed wheel would 404 on `GET /` and the static UI would be missing.
 - **No linter/formatter config** is declared here (only build, deps, and pytest).
+
+## v0.2 changes
+
+Version bumped to 0.2.0. Added an optional `[ocr]` extra (pytesseract, Pillow, pypdfium2); the `[dev]` extra now includes those too so the test-suite can exercise the OCR wiring. The Tesseract engine binary is still a separate OS-level install. Auth/history need no new deps (stdlib sqlite3/hashlib/hmac).
+

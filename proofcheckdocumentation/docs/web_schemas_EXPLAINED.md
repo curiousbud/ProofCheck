@@ -150,3 +150,8 @@ This module declares only pydantic `BaseModel` subclasses (no standalone functio
 - **JSON error envelope:** `ErrorResponse` documents the `{"error": ...}` shape used by the 422/500 handlers in `app.py`; clients never see raw tracebacks.
 
 IMPORT_EDGES: web/schemas.py -> (none)
+
+## v0.2 changes
+
+`HealthResponse` gained `auth_enabled` + `ocr_available`. New models: `Credentials`, `AuthUser` (auth) and `HistoryItem` (run_id, created_at, excel, pdf, summary, meta) + `HistoryList` (run history). These remain a pure serialization of internal state -- still the SWAP CONTRACT.
+

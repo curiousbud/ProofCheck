@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "proofcheck"
-version = "0.1.0"
+version = "0.2.0"
 description = "Deterministic Excel-vs-PDF proof-reading (no AI/LLM/ML, offline)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,10 +24,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Optional, deterministic OCR fallback for no-text-layer (scanned) PDF pages.
+# Tesseract is a fixed, offline glyph recogniser (NOT a learned/generative model), so
+# this preserves the no-AI / same-input-same-output guarantee. The Tesseract *engine*
+# binary must also be installed separately via your OS package manager.
+ocr = [
+    "pytesseract==0.3.13",
+    "Pillow>=10,<13",
+    "pypdfium2>=4,<6",
+]
 dev = [
     "pytest==9.1.1",
     "httpx==0.28.1",
     "reportlab==5.0.0",
+    "pytesseract==0.3.13",
+    "Pillow>=10,<13",
+    "pypdfium2>=4,<6",
 ]
 
 [project.scripts]

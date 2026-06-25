@@ -36,22 +36,43 @@ def strip_punct(text: str) -> str:
     return "".join(out)
 
 
+def fold_diacritics(text: str) -> str:
+    """Strip combining marks so accented/diacritic forms compare equal to their base.
+
+    Canonically decomposes (NFKD) then drops every combining mark, folding e.g.
+    ``café`` -> ``cafe``, ``Müller`` -> ``Muller``, ``José`` -> ``Jose``, and Arabic
+    harakat / Hebrew niqqud onto their base letters. Fully deterministic (pure unicode
+    table lookups), so it preserves ProofCheck's same-input-same-output guarantee.
+    """
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+# Internal alias so :func:`normalize` can still fold diacritics even though its keyword
+# argument ``fold_diacritics`` shadows the public function name inside that scope.
+_fold_diacritics = fold_diacritics
+
+
 def normalize(
     text: str,
     *,
     normalize_digits: bool = False,
     strip_punctuation: bool = False,
+    fold_diacritics: bool = False,
 ) -> str:
     """Return a canonical comparison form of ``text``.
 
     Baseline (always applied): NFKC unicode normalization, casefold (case-insensitive),
-    and whitespace collapse/trim. Optional: digit folding and punctuation stripping.
+    and whitespace collapse/trim. Optional: digit folding, diacritic/script folding, and
+    punctuation stripping.
     """
     if text is None:
         return ""
     text = unicodedata.normalize("NFKC", str(text))
     if normalize_digits:
         text = fold_digits(text)
+    if fold_diacritics:
+        text = _fold_diacritics(text)
     if strip_punctuation:
         text = strip_punct(text)
     text = text.casefold()

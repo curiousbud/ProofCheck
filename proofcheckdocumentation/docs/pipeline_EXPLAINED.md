@@ -179,3 +179,8 @@ For each loaded column, a `ColumnResult` is created and each `(row_num, value)` 
 - **Determinism:** No AI/ML anywhere in the path — given the same inputs and flags, `run()` produces identical results (aside from the wall-clock `Meta.timestamp`).
 - **File names, not paths:** `Meta` stores `os.path.basename(...)` so reports don't leak absolute/local directory paths.
 - **Order preserved:** columns and rows are processed and stored in their loaded order, keeping output stable and traceable to spreadsheet positions.
+
+## v0.2 changes
+
+`run()` now passes `ocr`/`ocr_dpi`/`ocr_lang` to `pdf.extract` and `fold_diacritics` to `match_value`, and echoes `fold_diacritics` + `ocr` in `Meta.flags`. OCR warnings flow through `pdf_text.warnings()` into `RunResult.warnings` unchanged.
+

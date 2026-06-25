@@ -1,5 +1,4 @@
 """Core data structures for ProofCheck.
-
 These dataclasses are the **stable internal contract**. The pipeline produces a
 ``RunResult``; CLI report writers and the web JSON layer both consume it without
 re-deriving anything. Keep these deterministic and free of any presentation
@@ -69,7 +68,11 @@ class RunConfig:
     fuzzy_threshold: int = 90         # 0-100; >= this score counts as FUZZY
     normalize_digits: bool = False    # fold Arabic-Indic & other unicode digits to ASCII
     strip_punctuation: bool = False   # drop punctuation before comparing
+    fold_diacritics: bool = False     # fold accents/diacritics (café -> cafe) before comparing
     reverse: bool = False             # also try reversed word order (e.g. "Last First")
+    ocr: bool = False                 # OCR no-text-layer pages as a fallback (deterministic Tesseract)
+    ocr_dpi: int = 300                # render DPI for OCR (higher = slower, more accurate)
+    ocr_lang: str = "eng"             # Tesseract language pack(s), e.g. "eng" or "eng+ara"
 
 
 @dataclass

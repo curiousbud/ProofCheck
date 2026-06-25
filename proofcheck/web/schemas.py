@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     version: str
+    # Lets a frontend decide whether to show a login screen without a second request.
+    auth_enabled: bool = False
+    ocr_available: bool = False
 
 
 class InspectResponse(BaseModel):
@@ -89,3 +92,32 @@ class ErrorResponse(BaseModel):
     """Human-readable error envelope (never raw tracebacks)."""
 
     error: str
+
+
+# ---- Auth (optional feature) ------------------------------------------------
+class Credentials(BaseModel):
+    username: str
+    password: str
+
+
+class AuthUser(BaseModel):
+    """The currently-authenticated user (or the anonymous single-user identity)."""
+
+    username: str
+    authenticated: bool
+
+
+# ---- Run history (optional feature) -----------------------------------------
+class HistoryItem(BaseModel):
+    """One past run's metadata. Report files may have expired; counts persist."""
+
+    run_id: str
+    created_at: str
+    excel: str
+    pdf: str
+    summary: SummaryModel
+    meta: MetaModel
+
+
+class HistoryList(BaseModel):
+    runs: list[HistoryItem] = Field(default_factory=list)

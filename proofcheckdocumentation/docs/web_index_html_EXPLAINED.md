@@ -285,3 +285,8 @@ $("search").addEventListener("input", renderTables);
 - **FormData field names must match `app.py`:** `excel`, `pdf`, `columns` (comma-joined), `all_columns`, `sheet`, `header_row` (hardcoded `"1"`), `fuzzy_threshold`, `normalize_digits`, `strip_punctuation`, `reverse`. Booleans are sent as their stringified values. Inspect posts only the `excel` field. If you swap this UI out, the replacement must send the same field names.
 
 RUNTIME_EDGES: POST /api/inspect, POST /api/check, GET /reports/... (HTML + xlsx report downloads via data.report_urls), served by GET /
+
+## v0.2 changes
+
+The disposable UI is now a framework-free SPA across three files: `index.html` (shell + nav + view mount), `app.js` (hash router + Login/Check/History views + `/api/*` client), and `app.css` (status palette shared with the reports). Still no framework, no build, no CDN; it only speaks `/api/*` and is replaceable wholesale (e.g. with a bundled React build).
+

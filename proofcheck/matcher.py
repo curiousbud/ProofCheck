@@ -68,6 +68,7 @@ def match_value(
     fuzzy_threshold: int = 90,
     normalize_digits: bool = False,
     strip_punctuation: bool = False,
+    fold_diacritics: bool = False,
     reverse: bool = False,
     row: int = 0,
 ) -> MatchResult:
@@ -77,7 +78,11 @@ def match_value(
                             status=Status.SKIPPED)
 
     expected_str = str(expected)
-    norm_kwargs = dict(normalize_digits=normalize_digits, strip_punctuation=strip_punctuation)
+    norm_kwargs = dict(
+        normalize_digits=normalize_digits,
+        strip_punctuation=strip_punctuation,
+        fold_diacritics=fold_diacritics,
+    )
     needle = normalize(expected_str, **norm_kwargs)
 
     # The candidate forms we'll try; reverse adds the swapped-word-order variant.

@@ -5,277 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ProofCheck</title>
 <!--
-  Intentionally disposable UI. Zero business logic lives here: it only calls the
-  /api/* JSON contract. To replace it, delete this file (and anything in static/)
-  and drop in your own build pointing at the same endpoints. No CDNs, offline.
+  ProofCheck SPA — a real single-page app, but framework-free and build-free on purpose.
+  The project's hard rule is "offline, no CDNs": rather than vendor a React/Vue runtime,
+  this is a small hand-rolled SPA (hash router + view modules in app.js). It is still a
+  disposable client: it only speaks the /api/* JSON contract, so you can replace it
+  wholesale (e.g. with a bundled React build) without touching the server.
+  Views: #/check (run a check), #/history (past runs), #/login (when auth is enabled).
 -->
-<style>
-  :root {
-    --exact:#2e7d32; --fuzzy:#f59e0b; --missing:#c62828; --skipped:#9e9e9e;
-    --bg:#f7f7f8; --card:#fff; --border:#e2e2e6; --ink:#1a1a1a; --muted:#666;
-  }
-  * { box-sizing: border-box; }
-  body { font-family:-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:var(--bg); color:var(--ink); }
-  header { background:#1a1a1a; color:#fff; padding:1rem 1.5rem; }
-  header h1 { margin:0; font-size:1.25rem; } header p { margin:.25rem 0 0; color:#bbb; font-size:.8rem; }
-  main { max-width:1100px; margin:0 auto; padding:1.5rem; }
-  .panel { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.25rem; margin-bottom:1.25rem; }
-  .row { display:flex; gap:1rem; flex-wrap:wrap; }
-  .field { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.9rem; flex:1; min-width:200px; }
-  label { font-size:.8rem; font-weight:600; color:var(--muted); }
-  input[type=file],select { padding:.45rem; border:1px solid var(--border); border-radius:6px; background:#fff; }
-  select[multiple] { min-height:120px; }
-  .checks { display:flex; gap:1.25rem; flex-wrap:wrap; align-items:center; }
-  .checks label { font-weight:400; color:var(--ink); display:flex; gap:.4rem; align-items:center; }
-  button { background:#1a1a1a; color:#fff; border:0; border-radius:6px; padding:.6rem 1.2rem; font-size:.95rem; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  .cards { display:flex; gap:.6rem; flex-wrap:wrap; }
-  .card { border:1px solid var(--border); border-radius:8px; padding:.6rem .9rem; min-width:90px; background:#fff; }
-  .card .n { font-size:1.5rem; font-weight:700; } .card .l { font-size:.7rem; color:var(--muted); text-transform:uppercase; }
-  .banner { background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:.75rem 1rem; margin-bottom:1rem; }
-  .banner.err { background:#fdecea; border-color:#f5c6cb; color:#7d1f1f; }
-  table { border-collapse:collapse; width:100%; font-size:.88rem; }
-  th,td { border:1px solid var(--border); padding:.4rem .6rem; text-align:left; vertical-align:top; }
-  th { background:#f3f3f5; position:sticky; top:0; }
-  .badge { font-weight:700; font-size:.72rem; padding:.1rem .45rem; border-radius:4px; color:#fff; }
-  .b-EXACT{background:var(--exact);} .b-FUZZY{background:var(--fuzzy);} .b-MISSING{background:var(--missing);} .b-SKIPPED{background:var(--skipped);}
-  del{background:#ffd7d5;text-decoration:line-through;} ins{background:#d7f5dd;text-decoration:none;}
-  .toolbar { display:flex; gap:.75rem; align-items:center; margin:.75rem 0; flex-wrap:wrap; }
-  .toolbar input[type=search]{ padding:.4rem .6rem; border:1px solid var(--border); border-radius:6px; min-width:220px; }
-  .spinner { display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:.5rem; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  .hidden { display:none; }
-  a.report { display:inline-block; margin-right:.75rem; color:#1a56db; }
-  .muted { color:var(--muted); font-size:.8rem; }
-</style>
+<link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header>
-  <h1>ProofCheck</h1>
-  <p>Deterministic Excel-vs-PDF proof-reading — no AI, offline.</p>
+  <div class="brand">
+    <h1>ProofCheck</h1>
+    <p>Deterministic Excel-vs-PDF proof-reading — no AI, offline.</p>
+  </div>
+  <nav id="nav">
+    <a href="#/check" data-route="check">Check</a>
+    <a href="#/history" data-route="history">History</a>
+    <span id="userBox" class="userbox hidden">
+      <span id="userName" class="muted"></span>
+      <button id="logoutBtn" class="link-btn">Log out</button>
+    </span>
+  </nav>
 </header>
-<main>
-  <div class="panel">
-    <div class="row">
-      <div class="field">
-        <label for="excel">Excel file (.xlsx / .xlsm)</label>
-        <input type="file" id="excel" accept=".xlsx,.xlsm">
-      </div>
-      <div class="field">
-        <label for="pdf">PDF file (.pdf)</label>
-        <input type="file" id="pdf" accept=".pdf">
-      </div>
-    </div>
-    <div class="row">
-      <div class="field" style="max-width:240px;">
-        <label for="sheet">Sheet</label>
-        <select id="sheet"></select>
-      </div>
-      <div class="field">
-        <label for="columns">Columns to check (select one or more)</label>
-        <select id="columns" multiple></select>
-        <span class="muted">Loaded from the Excel file. Hold Ctrl/Cmd for multiple.</span>
-      </div>
-    </div>
-    <div class="field" style="max-width:360px;">
-      <label for="threshold">Fuzzy threshold: <span id="thresholdVal">90</span></label>
-      <input type="range" id="threshold" min="0" max="100" value="90">
-    </div>
-    <div class="checks">
-      <label><input type="checkbox" id="normalize_digits"> Normalize digits</label>
-      <label><input type="checkbox" id="strip_punctuation"> Strip punctuation</label>
-      <label><input type="checkbox" id="reverse"> Reverse word order</label>
-      <label><input type="checkbox" id="all_columns"> Check all columns</label>
-    </div>
-    <div style="margin-top:1rem;">
-      <button id="run" disabled>Run check</button>
-      <span id="hint" class="muted">Select an Excel and a PDF file to begin.</span>
-    </div>
-  </div>
-
-  <div id="errorBanner" class="banner err hidden"></div>
-  <div id="warnBanner" class="banner hidden"></div>
-
-  <div id="results" class="hidden">
-    <div class="panel">
-      <div class="cards" id="cards"></div>
-      <div style="margin-top:1rem;">
-        <a class="report" id="dlHtml" target="_blank">Download HTML report</a>
-        <a class="report" id="dlXlsx">Download xlsx report</a>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="toolbar">
-        <label>Filter:
-          <select id="statusFilter">
-            <option value="">All</option>
-            <option value="EXACT">Exact</option>
-            <option value="FUZZY">Fuzzy</option>
-            <option value="MISSING">Missing</option>
-            <option value="SKIPPED">Skipped</option>
-          </select>
-        </label>
-        <input type="search" id="search" placeholder="Search expected / match…">
-      </div>
-      <div id="tables"></div>
-    </div>
-  </div>
-</main>
-
-<script>
-"use strict";
-const $ = (id) => document.getElementById(id);
-let lastData = null;
-
-function showError(msg) {
-  const b = $("errorBanner");
-  b.textContent = msg; b.classList.remove("hidden");
-}
-function clearError() { $("errorBanner").classList.add("hidden"); }
-
-function updateRunEnabled() {
-  $("run").disabled = !($("excel").files.length && $("pdf").files.length);
-}
-
-$("threshold").addEventListener("input", () => { $("thresholdVal").textContent = $("threshold").value; });
-$("pdf").addEventListener("change", updateRunEnabled);
-
-// On Excel select: inspect to populate sheet + column pickers.
-$("excel").addEventListener("change", async () => {
-  updateRunEnabled();
-  if (!$("excel").files.length) return;
-  clearError();
-  const fd = new FormData();
-  fd.append("excel", $("excel").files[0]);
-  try {
-    const res = await fetch("/api/inspect", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) { showError(data.error || data.detail || "Could not inspect file."); return; }
-    populatePickers(data);
-  } catch (e) { showError("Inspect failed: " + e.message); }
-});
-
-function populatePickers(data) {
-  const sheetSel = $("sheet");
-  sheetSel.innerHTML = "";
-  data.sheets.forEach((s) => {
-    const o = document.createElement("option"); o.value = s; o.textContent = s; sheetSel.appendChild(o);
-  });
-  const fillColumns = () => {
-    const cols = data.headers[sheetSel.value] || [];
-    const colSel = $("columns"); colSel.innerHTML = "";
-    cols.filter(Boolean).forEach((c) => {
-      const o = document.createElement("option"); o.value = c; o.textContent = c; colSel.appendChild(o);
-    });
-  };
-  sheetSel.onchange = fillColumns;
-  fillColumns();
-}
-
-$("run").addEventListener("click", async () => {
-  clearError();
-  const fd = new FormData();
-  fd.append("excel", $("excel").files[0]);
-  fd.append("pdf", $("pdf").files[0]);
-  const selected = Array.from($("columns").selectedOptions).map((o) => o.value);
-  fd.append("columns", selected.join(","));
-  fd.append("all_columns", $("all_columns").checked);
-  fd.append("sheet", $("sheet").value);
-  fd.append("header_row", "1");
-  fd.append("fuzzy_threshold", $("threshold").value);
-  fd.append("normalize_digits", $("normalize_digits").checked);
-  fd.append("strip_punctuation", $("strip_punctuation").checked);
-  fd.append("reverse", $("reverse").checked);
-
-  const btn = $("run");
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Running…';
-  try {
-    const res = await fetch("/api/check", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) { showError(data.error || data.detail || "Check failed."); return; }
-    lastData = data; render(data);
-  } catch (e) {
-    showError("Check failed: " + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = "Run check"; updateRunEnabled();
-  }
-});
-
-function card(label, value) {
-  return `<div class="card"><div class="n">${value}</div><div class="l">${label}</div></div>`;
-}
-
-function render(data) {
-  $("results").classList.remove("hidden");
-  const s = data.summary;
-  $("cards").innerHTML = [
-    card("Total", s.total), card("Exact", s.exact), card("Fuzzy", s.fuzzy),
-    card("Missing", s.missing), card("Skipped", s.skipped),
-    card("Pass rate", (s.pass_rate * 100).toFixed(1) + "%"),
-  ].join("");
-
-  $("dlHtml").href = data.report_urls.html;
-  $("dlXlsx").href = data.report_urls.xlsx;
-
-  const warn = $("warnBanner");
-  if (data.warnings && data.warnings.length) {
-    warn.innerHTML = "<b>Warnings</b><ul>" + data.warnings.map((w) => `<li>${esc(w)}</li>`).join("") + "</ul>";
-    warn.classList.remove("hidden");
-  } else { warn.classList.add("hidden"); }
-
-  renderTables();
-}
-
-function esc(s) {
-  return String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
-}
-
-function diffHtml(diff, best) {
-  if (!diff || !diff.length) return esc(best || "");
-  return diff.map(([op, text]) => {
-    const t = esc(text);
-    if (op === "equal") return t;
-    if (op === "delete") return `<del>${t}</del>`;
-    if (op === "insert") return `<ins>${t}</ins>`;
-    return `<del>${t}</del>`;
-  }).join("");
-}
-
-function renderTables() {
-  if (!lastData) return;
-  const filter = $("statusFilter").value;
-  const query = $("search").value.trim().toLowerCase();
-  const container = $("tables"); container.innerHTML = "";
-
-  lastData.columns.forEach((col) => {
-    const rows = col.results.filter((r) => {
-      if (filter && r.status !== filter) return false;
-      if (query) {
-        const hay = (r.expected + " " + (r.best_match || "")).toLowerCase();
-        if (!hay.includes(query)) return false;
-      }
-      return true;
-    });
-    if (!rows.length) return;
-    const h = document.createElement("h3"); h.textContent = col.name; container.appendChild(h);
-    const table = document.createElement("table");
-    table.innerHTML = "<thead><tr><th>Row</th><th>Status</th><th>Expected</th>" +
-      "<th>Best match / diff</th><th>Page</th><th>Score</th></tr></thead><tbody>" +
-      rows.map((r) =>
-        `<tr><td>${r.row}</td>` +
-        `<td><span class="badge b-${r.status}">${r.status}</span></td>` +
-        `<td>${esc(r.expected)}</td>` +
-        `<td>${diffHtml(r.diff, r.best_match)}</td>` +
-        `<td>${r.page == null ? "" : r.page}</td>` +
-        `<td>${r.score}</td></tr>`
-      ).join("") + "</tbody>";
-    container.appendChild(table);
-  });
-  if (!container.innerHTML) container.innerHTML = '<p class="muted">No rows match the current filter.</p>';
-}
-
-$("statusFilter").addEventListener("change", renderTables);
-$("search").addEventListener("input", renderTables);
-</script>
+<main id="view"><!-- views render here --></main>
+<footer class="muted" id="footer"></footer>
+<script src="/static/app.js"></script>
 </body>
 </html>

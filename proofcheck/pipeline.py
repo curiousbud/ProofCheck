@@ -64,9 +64,14 @@ def run(config: RunConfig) -> RunResult:
     if not column_data:
         raise PipelineError("No columns to check were found on the sheet.")
 
-    # 2. Extract the PDF text layer.
+    # 2. Extract the PDF text layer (optionally OCR'ing no-text-layer pages).
     try:
-        pdf_text = pdf.extract(config.pdf_path)
+        pdf_text = pdf.extract(
+            config.pdf_path,
+            ocr=config.ocr,
+            ocr_dpi=config.ocr_dpi,
+            ocr_lang=config.ocr_lang,
+        )
     except pdf.PdfError as exc:
         raise PipelineError(str(exc)) from exc
 
@@ -82,6 +87,7 @@ def run(config: RunConfig) -> RunResult:
                     fuzzy_threshold=config.fuzzy_threshold,
                     normalize_digits=config.normalize_digits,
                     strip_punctuation=config.strip_punctuation,
+                    fold_diacritics=config.fold_diacritics,
                     reverse=config.reverse,
                     row=row_num,
                 )
@@ -98,8 +104,10 @@ def run(config: RunConfig) -> RunResult:
         flags={
             "normalize_digits": config.normalize_digits,
             "strip_punctuation": config.strip_punctuation,
+            "fold_diacritics": config.fold_diacritics,
             "reverse": config.reverse,
             "all_columns": config.all_columns,
+            "ocr": config.ocr,
         },
     )
     return RunResult(

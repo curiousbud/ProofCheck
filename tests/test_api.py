@@ -31,6 +31,13 @@ def test_index_served():
     assert "ProofCheck" in res.text
 
 
+def test_spa_static_assets_served():
+    css = client.get("/static/app.css")
+    js = client.get("/static/app.js")
+    assert css.status_code == 200 and "ProofCheck" in css.text
+    assert js.status_code == 200 and "/api/check" in js.text
+
+
 def test_inspect_returns_sheets_and_headers(excel_path):
     res = client.post(
         "/api/inspect",

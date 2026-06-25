@@ -327,3 +327,8 @@ Not applicable to this file — see `web_schemas_EXPLAINED.md`.
 - **Upload size cap:** enforced while streaming (`MAX_UPLOAD_MB`, default 25), raising 413 mid-stream rather than buffering the whole file.
 
 IMPORT_EDGES: web/app.py -> __init__.py (proofcheck package, __version__), report_html.py, report_xlsx.py, models.py, pipeline.py, excel.py, web/schemas.py
+
+## v0.2 changes
+
+v0.2: mounts `/static` (StaticFiles) for the SPA assets; `/` still serves index.html. `/api/health` now reports `auth_enabled` + `ocr_available`. `/api/inspect` and `/api/check` depend on `auth.current_user` (anonymous when auth off, 401 when on). `/api/check` accepts `fold_diacritics`/`ocr`/`ocr_lang`/`ocr_dpi` form fields and records non-PII history via `store.add_run`. New routes: `/api/auth/{login,logout,me,register}` and `/api/history` (+ `/{run_id}` GET/DELETE). `store.init_db()` + `auth.bootstrap_admin()` run at import. See web_auth_EXPLAINED.md / web_store_EXPLAINED.md.
+

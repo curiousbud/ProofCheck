@@ -183,3 +183,8 @@ The top-level, self-describing output of a run. Requires a `Meta` and a `Summary
 - **`pass_rate` excludes skipped:** The denominator (`checked`) intentionally omits `SKIPPED` values; an all-blank run would not count toward the pass rate. The actual arithmetic is performed in `pipeline.py`, not here.
 - **`replace` diff op is reserved:** The matcher decomposes replacements into `delete` + `insert`, so a `replace` op is documented but not currently emitted.
 - **Presentation-free by design:** No HTML, colors, or formatting belong in these types; keep rendering concerns in the report writers.
+
+## v0.2 changes
+
+`RunConfig` gained `fold_diacritics: bool`, `ocr: bool`, `ocr_dpi: int = 300`, and `ocr_lang: str = 'eng'`. `Meta.flags` now also echoes `fold_diacritics` and `ocr` (still a `dict[str, bool]`; dpi/lang are config, not flags).
+

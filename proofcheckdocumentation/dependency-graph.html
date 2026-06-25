@@ -96,20 +96,23 @@ const NODES = [
   { id:"normalize.py",     doc:"docs/normalize_EXPLAINED.md",         kind:"leaf",   col:0, label:"normalize.py",     sub:"text normalize" },
   { id:"excel.py",         doc:"docs/excel_EXPLAINED.md",             kind:"leaf",   col:0, label:"excel.py",         sub:"openpyxl load" },
   { id:"pdf.py",           doc:"docs/pdf_EXPLAINED.md",               kind:"leaf",   col:0, label:"pdf.py",           sub:"pdfplumber text" },
+  { id:"ocr.py",           doc:"docs/ocr_EXPLAINED.md",               kind:"leaf",   col:0, label:"ocr.py",           sub:"OCR fallback (opt)" },
   { id:"__init__.py",      doc:"docs/proofcheck_init_EXPLAINED.md",   kind:"leaf",   col:0, label:"__init__.py",      sub:"version marker" },
   { id:"web/schemas.py",   doc:"docs/web_schemas_EXPLAINED.md",       kind:"schema", col:0, label:"web/schemas.py",   sub:"SWAP CONTRACT" },
+  { id:"web/store.py",     doc:"docs/web_store_EXPLAINED.md",         kind:"leaf",   col:0, label:"web/store.py",     sub:"sqlite users/runs" },
   { id:"web/__init__.py",  doc:"docs/web_init_EXPLAINED.md",          kind:"leaf",   col:0, label:"web/__init__.py",  sub:"web package" },
   // Logic layer (col 1)
   { id:"matcher.py",       doc:"docs/matcher_EXPLAINED.md",           kind:"logic",  col:1, label:"matcher.py",       sub:"match + diff" },
   { id:"report_html.py",   doc:"docs/report_html_EXPLAINED.md",       kind:"logic",  col:1, label:"report_html.py",   sub:"HTML report" },
   { id:"report_xlsx.py",   doc:"docs/report_xlsx_EXPLAINED.md",       kind:"logic",  col:1, label:"report_xlsx.py",   sub:"xlsx report" },
+  { id:"web/auth.py",      doc:"docs/web_auth_EXPLAINED.md",          kind:"logic",  col:1, label:"web/auth.py",      sub:"auth + sessions" },
   // Orchestration (col 2)
   { id:"pipeline.py",      doc:"docs/pipeline_EXPLAINED.md",          kind:"entry",  col:2, label:"pipeline.py",      sub:"run(RunConfig)" },
   // Entry points (col 3)
   { id:"cli.py",           doc:"docs/cli_EXPLAINED.md",               kind:"entry",  col:3, label:"cli.py",           sub:"click CLI" },
   { id:"web/app.py",       doc:"docs/web_app_EXPLAINED.md",           kind:"entry",  col:3, label:"web/app.py",       sub:"FastAPI" },
   // Clients (col 4)
-  { id:"web/static/index.html", doc:"docs/web_index_html_EXPLAINED.md", kind:"client", col:4, label:"index.html", sub:"vanilla UI" },
+  { id:"web/static/index.html", doc:"docs/web_index_html_EXPLAINED.md", kind:"client", col:4, label:"SPA (app.js)", sub:"hash-routed SPA" },
   // Config
   { id:"pyproject.toml",   doc:"docs/pyproject_EXPLAINED.md",         kind:"config", col:4, label:"pyproject.toml",   sub:"packaging" },
   // Tests (col 3/4, toggled)
@@ -118,6 +121,8 @@ const NODES = [
   { id:"tests/test_matcher.py",  doc:"docs/tests_test_matcher_EXPLAINED.md",   kind:"test", col:2, label:"test_matcher.py",   sub:"", test:true },
   { id:"tests/test_pipeline.py", doc:"docs/tests_test_pipeline_EXPLAINED.md",  kind:"test", col:3, label:"test_pipeline.py",  sub:"", test:true },
   { id:"tests/test_api.py",      doc:"docs/tests_test_api_EXPLAINED.md",       kind:"test", col:4, label:"test_api.py",       sub:"", test:true },
+  { id:"tests/test_ocr.py",      doc:"",                                       kind:"test", col:1, label:"test_ocr.py",       sub:"", test:true },
+  { id:"tests/test_auth.py",     doc:"",                                       kind:"test", col:4, label:"test_auth.py",      sub:"", test:true },
 ];
 
 // edge kinds: "import" (solid), "lazy" (dashed), "runtime" (red dotted), "test" (faint)
@@ -130,6 +135,8 @@ const EDGES = [
   { from:"pipeline.py",    to:"pdf.py" },
   { from:"pipeline.py",    to:"matcher.py" },
   { from:"pipeline.py",    to:"models.py" },
+  { from:"pdf.py",         to:"ocr.py", kind:"lazy" },            // OCR fallback imported inside _apply_ocr
+  { from:"web/auth.py",    to:"web/store.py" },
   { from:"cli.py",         to:"pipeline.py" },
   { from:"cli.py",         to:"excel.py" },
   { from:"cli.py",         to:"models.py" },
@@ -142,6 +149,9 @@ const EDGES = [
   { from:"web/app.py",     to:"report_html.py" },
   { from:"web/app.py",     to:"report_xlsx.py" },
   { from:"web/app.py",     to:"web/schemas.py" },
+  { from:"web/app.py",     to:"web/auth.py" },
+  { from:"web/app.py",     to:"web/store.py" },
+  { from:"web/app.py",     to:"ocr.py" },                         // health reports ocr.available()
   { from:"web/app.py",     to:"__init__.py" },
   { from:"web/app.py",     to:"excel.py", kind:"lazy" },         // re-imported inside /api/inspect
   { from:"web/static/index.html", to:"web/app.py", kind:"runtime" }, // HTTP /api/*
@@ -154,6 +164,12 @@ const EDGES = [
   { from:"tests/test_pipeline.py",  to:"models.py",    kind:"test" },
   { from:"tests/test_api.py",       to:"web/app.py",   kind:"test" },
   { from:"tests/test_api.py",       to:"tests/conftest.py", kind:"test" },
+  { from:"tests/test_ocr.py",       to:"ocr.py",       kind:"test" },
+  { from:"tests/test_ocr.py",       to:"pdf.py",       kind:"test" },
+  { from:"tests/test_ocr.py",       to:"tests/conftest.py", kind:"test" },
+  { from:"tests/test_auth.py",      to:"web/app.py",   kind:"test" },
+  { from:"tests/test_auth.py",      to:"web/auth.py",  kind:"test" },
+  { from:"tests/test_auth.py",      to:"tests/conftest.py", kind:"test" },
   { from:"tests/test_matcher.py",   to:"tests/conftest.py", kind:"test" },
   { from:"tests/test_pipeline.py",  to:"tests/conftest.py", kind:"test" },
 ];

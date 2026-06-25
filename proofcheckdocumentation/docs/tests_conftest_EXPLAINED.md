@@ -114,3 +114,8 @@ Session-scoped. Draws each `PDF_LINES` entry on page 1 at x=72, starting y=720 a
 - **Session scope:** both fixtures are `scope="session"` so each file is built once, keeping the suite fast.
 - **No-text-layer page:** page 2 deliberately has only a rectangle to exercise the warning path without OCR.
 - **The blank-row design** is what produces the SKIPPED status and the `pass_rate` denominator of 4 (5 total minus 1 skipped) in the pipeline tests.
+
+## v0.2 changes
+
+Added an autouse `_isolated_db` fixture that points `PROOFCHECK_DB` at a per-test throwaway SQLite file (and calls `store.init_db()`), isolating users/history between tests. Auth stays disabled by default; auth tests opt in via `PROOFCHECK_AUTH`.
+

@@ -249,3 +249,8 @@ if __name__ == "__main__":
 - **Minor:** `inspect`'s `--header-row` (and largely `--sheet`) are accepted but barely influence its output; `Status` is imported at module level but not referenced in the command bodies.
 
 IMPORT_EDGES: proofcheck.cli -> proofcheck (__version__); proofcheck.cli -> proofcheck.excel; proofcheck.cli -> proofcheck.models (RunConfig, Status); proofcheck.cli -> proofcheck.pipeline (PipelineError, run); proofcheck.cli -> proofcheck.report_html (lazy, in check); proofcheck.cli -> proofcheck.report_xlsx (lazy, in check); proofcheck.cli -> proofcheck.web.app:app (runtime import-string via uvicorn in serve)
+
+## v0.2 changes
+
+`check` gained `--fold-diacritics`, `--ocr`, `--ocr-dpi` (IntRange 72-1200), and `--ocr-lang` options, wired straight into `RunConfig`. No change to `inspect`/`serve`.
+

@@ -128,3 +128,8 @@ Splits on whitespace (`text.split()` with no args splits on any whitespace and d
 - **Punctuation becomes a space, not nothing:** This deliberately preserves token boundaries; combined with the final whitespace collapse it avoids accidentally gluing words together.
 - **`fold_digits` guards `None` from `unicodedata.digit`:** Characters that satisfy `ch.isdigit()` but lack a decimal value (rare) are kept as-is rather than crashing.
 - **`casefold` vs `lower`:** `casefold` is used for more aggressive, internationally correct case-insensitive matching (e.g. German ß → ss).
+
+## v0.2 changes
+
+Added a `fold_diacritics` option and a `fold_diacritics(text)` helper (NFKD-decompose, drop combining marks) so accented forms (cafe vs cafe) compare equal. `normalize()` gained the `fold_diacritics` keyword; an internal `_fold_diacritics` alias is used inside `normalize` because the keyword shadows the public function name. Digit folding already covered all unicode scripts.
+

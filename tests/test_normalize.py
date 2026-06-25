@@ -1,4 +1,10 @@
-from proofcheck.normalize import fold_digits, normalize, reverse_words, strip_punct
+from proofcheck.normalize import (
+    fold_diacritics,
+    fold_digits,
+    normalize,
+    reverse_words,
+    strip_punct,
+)
 
 
 def test_baseline_casefold_and_whitespace():
@@ -30,6 +36,25 @@ def test_strip_punct_replaces_with_space():
 def test_reverse_words():
     assert reverse_words("john smith") == "smith john"
     assert reverse_words("madonna") == "madonna"
+
+
+def test_fold_diacritics_helper():
+    assert fold_diacritics("Café") == "Cafe"
+    assert fold_diacritics("Müller") == "Muller"
+    assert fold_diacritics("José Núñez") == "Jose Nunez"
+
+
+def test_fold_diacritics_flag():
+    # With folding, accented and unaccented forms canonicalize identically.
+    assert normalize("Café Núñez", fold_diacritics=True) == "cafe nunez"
+    # Without it, the accents survive (so they would NOT compare equal).
+    assert normalize("Café Núñez", fold_diacritics=False) != "cafe nunez"
+
+
+def test_fold_diacritics_is_deterministic():
+    a = normalize("Renée Zoë", fold_diacritics=True)
+    b = normalize("Renée Zoë", fold_diacritics=True)
+    assert a == b == "renee zoe"
 
 
 def test_none_is_empty():

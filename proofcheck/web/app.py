@@ -14,14 +14,15 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-from .. import __version__, report_html, report_xlsx
+from .. import __version__, ocr, report_html, report_xlsx
 from ..models import RunConfig, RunResult
 from ..pipeline import PipelineError, run as pipeline_run
-from . import schemas
+from . import auth, schemas, store
 
 # ---- Configuration (env-driven, MVP-appropriate defaults) -------------------
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "25"))
@@ -57,7 +58,18 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,  # session cookie is sent on same-origin /api/* calls
 )
+
+# Initialise persistence eagerly so the schema exists regardless of how the app is
+# started (uvicorn, TestClient, embedded). Both calls are cheap and idempotent, and run
+# at import time so they apply even when the ASGI lifespan isn't triggered (bare
+# TestClient). Reload workers re-import the module, so this also covers --reload.
+store.init_db()
+auth.bootstrap_admin()
+
+# Serve the SPA's static assets (app.css / app.js). "/" still returns index.html below.
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 
 # ---- Error handling: human-readable JSON, never raw tracebacks --------------
@@ -170,6 +182,49 @@ def _parse_bool(value: str | None) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"} if value is not None else False
 
 
+def _summary_dict(result: RunResult) -> dict:
+    s = result.summary
+    return {
+        "total": s.total, "exact": s.exact, "fuzzy": s.fuzzy,
+        "missing": s.missing, "skipped": s.skipped, "pass_rate": s.pass_rate,
+    }
+
+
+def _meta_dict(result: RunResult) -> dict:
+    m = result.meta
+    return {
+        "excel": m.excel, "pdf": m.pdf, "timestamp": m.timestamp,
+        "fuzzy_threshold": m.fuzzy_threshold, "flags": m.flags,
+    }
+
+
+def _record_history(run_id: str, user: str, result: RunResult) -> None:
+    """Store non-PII run metadata. Never lets a storage hiccup fail the actual check."""
+    try:
+        store.add_run(
+            run_id=run_id,
+            username=user,
+            created_at=result.meta.timestamp,
+            excel=result.meta.excel,
+            pdf=result.meta.pdf,
+            summary=_summary_dict(result),
+            meta=_meta_dict(result),
+        )
+    except Exception:  # pragma: no cover - history is best-effort, never blocks a run
+        pass
+
+
+def _history_item(record: store.RunRecord) -> schemas.HistoryItem:
+    return schemas.HistoryItem(
+        run_id=record.run_id,
+        created_at=record.created_at,
+        excel=record.excel,
+        pdf=record.pdf,
+        summary=schemas.SummaryModel(**record.summary),
+        meta=schemas.MetaModel(**record.meta),
+    )
+
+
 # ---- Routes -----------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
@@ -180,11 +235,19 @@ async def index() -> HTMLResponse:
 
 @app.get("/api/health", response_model=schemas.HealthResponse)
 async def health() -> schemas.HealthResponse:
-    return schemas.HealthResponse(status="ok", version=__version__)
+    return schemas.HealthResponse(
+        status="ok",
+        version=__version__,
+        auth_enabled=auth.auth_enabled(),
+        ocr_available=ocr.available(),
+    )
 
 
 @app.post("/api/inspect", response_model=schemas.InspectResponse)
-async def inspect(excel: UploadFile = File(...)) -> schemas.InspectResponse:  # noqa: A002
+async def inspect(
+    excel: UploadFile = File(...),  # noqa: A002
+    user: str = Depends(auth.current_user),
+) -> schemas.InspectResponse:
     """Return sheets + headers so the UI can build a column picker."""
     _validate_ext(excel.filename, EXCEL_EXTS, "Excel file")
     path = await _save_upload(excel, suffix=".xlsx")
@@ -209,7 +272,12 @@ async def check(
     fuzzy_threshold: int = Form(90),
     normalize_digits: str = Form("false"),
     strip_punctuation: str = Form("false"),
+    fold_diacritics: str = Form("false"),
     reverse: str = Form("false"),
+    ocr: str = Form("false"),  # noqa: A002 - shadows the ocr module locally; resolved below
+    ocr_lang: str = Form("eng"),
+    ocr_dpi: int = Form(300),
+    user: str = Depends(auth.current_user),
 ) -> JSONResponse:
     """Run a full check and return the documented JSON shape + report download URLs."""
     _cleanup_reports()
@@ -233,7 +301,11 @@ async def check(
             fuzzy_threshold=fuzzy_threshold,
             normalize_digits=_parse_bool(normalize_digits),
             strip_punctuation=_parse_bool(strip_punctuation),
+            fold_diacritics=_parse_bool(fold_diacritics),
             reverse=_parse_bool(reverse),
+            ocr=_parse_bool(ocr),
+            ocr_lang=ocr_lang or "eng",
+            ocr_dpi=ocr_dpi,
         )
         result = pipeline_run(config)
 
@@ -243,6 +315,9 @@ async def check(
         result.meta.pdf = pdf.filename or result.meta.pdf
         report_html.write(result, str(_REPORT_DIR / f"{run_id}.html"))
         report_xlsx.write(result, str(_REPORT_DIR / f"{run_id}.xlsx"))
+
+        # Persist non-PII run metadata so it survives the short-lived report cache.
+        _record_history(run_id, user, result)
 
         return JSONResponse(content=_serialize(result, run_id))
     finally:
@@ -264,3 +339,81 @@ async def download_report(run_id: str, ext: str) -> FileResponse:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     return FileResponse(path, media_type=media, filename=f"proofcheck-{run_id}.{ext}")
+
+
+# ---- Auth routes (optional; no-ops semantically when auth is disabled) -------
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=auth.SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=auth._session_seconds(),
+        path="/",
+    )
+
+
+@app.post("/api/auth/login", response_model=schemas.AuthUser)
+async def login(credentials: schemas.Credentials, response: Response) -> schemas.AuthUser:
+    """Validate credentials and set an HttpOnly session cookie."""
+    if not auth.auth_enabled():
+        # Auth is off: there is nothing to log into; report the single-user identity.
+        return schemas.AuthUser(username=auth.ANONYMOUS, authenticated=False)
+    if not auth.authenticate(credentials.username, credentials.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+    _set_session_cookie(response, auth.make_token(credentials.username))
+    return schemas.AuthUser(username=credentials.username, authenticated=True)
+
+
+@app.post("/api/auth/logout")
+async def logout(response: Response) -> dict:
+    response.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return {"status": "ok"}
+
+
+@app.get("/api/auth/me", response_model=schemas.AuthUser)
+async def me(user: str = Depends(auth.current_user)) -> schemas.AuthUser:
+    """Return the current user (the dependency enforces 401 when auth is on)."""
+    return schemas.AuthUser(username=user, authenticated=auth.auth_enabled())
+
+
+@app.post("/api/auth/register", response_model=schemas.AuthUser, status_code=201)
+async def register(credentials: schemas.Credentials, response: Response) -> schemas.AuthUser:
+    """Self-service registration. Disabled unless PROOFCHECK_ALLOW_REGISTER is on."""
+    if not auth.auth_enabled() or not auth.registration_enabled():
+        raise HTTPException(status_code=403, detail="Registration is disabled.")
+    try:
+        auth.register_user(credentials.username, credentials.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    _set_session_cookie(response, auth.make_token(credentials.username))
+    return schemas.AuthUser(username=credentials.username, authenticated=True)
+
+
+# ---- Run history routes (persisted metadata; PII inputs are never stored) ----
+@app.get("/api/history", response_model=schemas.HistoryList)
+async def history(user: str = Depends(auth.current_user)) -> schemas.HistoryList:
+    return schemas.HistoryList(runs=[_history_item(r) for r in store.list_runs(user)])
+
+
+@app.get("/api/history/{run_id}", response_model=schemas.HistoryItem)
+async def history_item(run_id: str, user: str = Depends(auth.current_user)) -> schemas.HistoryItem:
+    if not run_id.isalnum():
+        raise HTTPException(status_code=404, detail="Run not found.")
+    record = store.get_run(run_id, user)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    return _history_item(record)
+
+
+@app.delete("/api/history/{run_id}")
+async def delete_history_item(run_id: str, user: str = Depends(auth.current_user)) -> dict:
+    if not run_id.isalnum() or not store.delete_run(run_id, user):
+        raise HTTPException(status_code=404, detail="Run not found.")
+    # Best-effort: also drop any cached report files for this run.
+    for ext in ("html", "xlsx"):
+        try:
+            (_REPORT_DIR / f"{run_id}.{ext}").unlink()
+        except OSError:
+            pass
+    return {"status": "deleted", "run_id": run_id}

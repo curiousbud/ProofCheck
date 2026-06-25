@@ -38,6 +38,19 @@ PDF_LINES = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _isolated_db(tmp_path, monkeypatch):
+    """Point the web store at a throwaway SQLite file per test (auth/history isolation).
+
+    Auth stays disabled by default (PROOFCHECK_AUTH unset), so the existing API tests are
+    unaffected; tests that exercise auth opt in by setting the env var themselves.
+    """
+    monkeypatch.setenv("PROOFCHECK_DB", str(tmp_path / "proofcheck.db"))
+    from proofcheck.web import store
+    store.init_db()
+    yield
+
+
 @pytest.fixture(scope="session")
 def excel_path(tmp_path_factory) -> str:
     path = tmp_path_factory.mktemp("fixtures") / "delegates.xlsx"

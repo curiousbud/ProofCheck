@@ -112,3 +112,8 @@ Error handling: a `PdfError` raised inside is re-raised unchanged (`except PdfEr
 - **`extract_text()` returning `None`:** normalized with `or ""` so the rest of the code can assume a string.
 - **Error handling:** explicit `PdfError`s pass through unchanged; all other failures are wrapped into `PdfError` (with `from exc`) for clean user-facing messages. The `with pdfplumber.open(...)` context manager ensures the file handle is always released.
 - **Whitespace:** pdfplumber already joins/normalizes whitespace within a page's extracted text; this module does not re-tokenize it.
+
+## v0.2 changes
+
+`extract()` now takes `ocr`/`ocr_dpi`/`ocr_lang`. When `ocr=True` and pages have no text layer, `_apply_ocr` lazily imports `proofcheck.ocr` and recovers them. `PdfText` gained `ocr_pages`, `ocr_unavailable_reason`, and `ocr_error` fields; `warnings()` now reports OCR-recovered pages and any OCR unavailability/error. OCR never raises into a run -- failures are recorded as warnings, preserving determinism. See ocr_EXPLAINED.md.
+
