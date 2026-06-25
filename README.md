@@ -11,6 +11,95 @@ glyph recogniser, not a learned model — so it stays deterministic too.
 
 ---
 
+## Features
+
+A complete tour of what ProofCheck does and why.
+
+### Verification engine
+- **Excel → PDF value checking.** Reads selected columns from a spreadsheet and verifies
+  each value actually appears in the PDF. Every cell gets one verdict:
+  - `EXACT` — found verbatim (after normalization)
+  - `FUZZY` — found a close match at/above your similarity threshold
+  - `MISSING` — no match at/above the threshold
+  - `SKIPPED` — blank cell, nothing to check
+- **Deterministic fuzzy matching.** rapidfuzz `partial_ratio` (0–100) with an adjustable
+  `--fuzzy-threshold`. Pure function of its inputs — no randomness, no model.
+- **Character-level diffs.** For every fuzzy/missing value you get a `[op, text]` diff
+  (`equal`/`insert`/`delete`) showing exactly how the expected value differs from what was
+  found, rendered as `<del>`/`<ins>` highlighting in the UI and reports.
+- **Pass rate** = `(exact + fuzzy) / (total − skipped)`; blank cells are excluded.
+- **Per-page location.** Each match reports the PDF page it was found on.
+
+### Text normalization (toggle per run)
+All normalization is deterministic and applied to both sides before comparison:
+- **Always on:** Unicode NFKC, case-folding, and whitespace collapse/trim.
+- **`--normalize-digits`** — fold Arabic-Indic & other Unicode digits to ASCII (`١٠` → `10`).
+- **`--strip-punctuation`** — ignore punctuation/symbols when matching (`CC-101` ≈ `CC 101`).
+- **`--fold-diacritics`** — accent/diacritic folding so `Núñez` matches `Nunez`, `Café` = `Cafe`.
+- **`--reverse`** — also try reversed word order, so `John Smith` matches `Smith John`.
+
+### OCR for scanned / image-only pages (optional, deterministic)
+- Pages with no embedded text layer are normally reported as warnings and skipped.
+- With **`--ocr`** (CLI) or the **OCR checkbox** (web), those pages are rendered
+  (`pypdfium2`) and read with the offline **Tesseract** engine — a fixed glyph recognizer,
+  so the same image at the same DPI always yields the same text. It recovers real glyphs;
+  it never *guesses*.
+- Tunable: **`--ocr-lang`** (e.g. `eng+ara`) and **`--ocr-dpi`** (default 300).
+- **Graceful:** if the OCR libraries or the Tesseract binary aren't present, OCR just stays
+  off and pages fall back to warn-and-skip — a run never crashes. The web `/api/health`
+  endpoint and the UI's "OCR ready / not installed" pill reflect availability.
+
+### Reports
+- **Standalone HTML report** — self-contained, color-coded by status, with diff highlighting.
+- **xlsx report** — a summary sheet plus per-column sheets, color-coded.
+- Both are generated from the same result and offered as downloads from the CLI and web UI.
+
+### Command-line interface
+- **`proofcheck inspect`** — list a workbook's sheets and column headers.
+- **`proofcheck check`** — run a verification, write reports, print a summary. Exits
+  **non-zero when anything is `MISSING`**, so it can gate CI pipelines.
+- **`proofcheck serve`** — launch the web UI / JSON API.
+
+### Web app (single-page, framework-free, offline)
+- A real hash-routed SPA with three views: **Check**, **History**, and **Login**
+  (when auth is enabled) — no framework, no build step, no CDN.
+- Drag-free workflow: pick the Excel → it auto-loads sheets/columns into a picker → pick the
+  PDF → tune flags/threshold → run. Results are filterable by status and searchable, with
+  inline diff highlighting and one-click report downloads.
+- Re-uploading an **edited file** re-reads it automatically (no page refresh needed), and your
+  column selection is preserved across re-inspects.
+- It only speaks the documented `/api/*` JSON contract, so the whole frontend is replaceable
+  wholesale (e.g. with a bundled React/Vue build) without touching the backend.
+
+### Authentication & run history (optional, opt-in, zero-infra)
+- **Auth** (`PROOFCHECK_AUTH=on`): login/logout/register with salted PBKDF2-HMAC-SHA256
+  password hashing and HMAC-signed HttpOnly session cookies. Off by default → a single
+  `anonymous` user, so nothing is required to get started.
+- **Persistent run history**: every run's **non-PII metadata** (filenames, summary counts,
+  flags) is stored in SQLite and listed per user; open a past run or delete it. The uploaded
+  spreadsheets/PDFs themselves are never stored.
+- Both use only the standard library (`sqlite3`, `hashlib`, `hmac`) — no Redis, no database
+  server, no external identity provider.
+
+### Privacy & operational safeguards
+- Uploads are treated as **PII**: streamed to per-request tempfiles and **deleted immediately**
+  after each run, success or failure.
+- Generated reports live in a short-lived cache keyed by an opaque `run_id`, auto-cleaned after ~1h.
+- Upload **size cap** (`MAX_UPLOAD_MB`, default 25 → `413`) and **extension validation**
+  (`.xlsx`/`.xlsm`, `.pdf` → `400`).
+- CORS allow-list (`CORS_ORIGINS`); errors returned as human-readable JSON, never raw tracebacks.
+
+### Architecture & tooling
+- **One orchestration entry point** — `pipeline.run(RunConfig) -> RunResult`. The CLI and the
+  web API both call it; there is no duplicated logic. The UI/server boundary is a documented
+  JSON contract (`web/schemas.py`).
+- **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
+  create a virtualenv, install the package, and run the tests in one command.
+- **Deterministic test suite** (49 tests) with fixtures generated on the fly — no committed
+  binaries. OCR tests pass with or without the engine installed.
+
+---
+
 ## Quick setup (recommended)
 
 One command installs the Tesseract OCR engine, creates a virtualenv, installs the package

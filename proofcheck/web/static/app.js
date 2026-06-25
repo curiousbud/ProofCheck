@@ -125,6 +125,12 @@ function wireCheck() {
   $("pdf").addEventListener("change", updateRun);
   $("ocr").addEventListener("change", () => $("ocrOpts").classList.toggle("hidden", !$("ocr").checked));
 
+  // Re-selecting the SAME filename normally does NOT fire `change`, so editing a file and
+  // re-uploading it wouldn't update the UI (you'd have to refresh the page). Clearing the
+  // input's value when the picker opens guarantees `change` fires every time — even for the
+  // same path — so the freshly-saved file content is always what gets read and sent.
+  ["excel", "pdf"].forEach((id) => $(id).addEventListener("click", () => { $(id).value = ""; }));
+
   $("excel").addEventListener("change", async () => {
     updateRun();
     if (!$("excel").files.length) return;
@@ -145,15 +151,29 @@ function wireCheck() {
     const sheetSel = $("sheet"); sheetSel.innerHTML = "";
     data.sheets.forEach((s) => sheetSel.appendChild(el("option", { value: s }, s)));
     const fill = () => {
+      const colSel = $("columns");
+      // Preserve the user's column picks across a re-inspect (e.g. after re-uploading an
+      // edited file), so they don't have to reselect columns every time.
+      const previously = new Set(Array.from(colSel.selectedOptions).map((o) => o.value));
       const cols = (data.headers[sheetSel.value] || []).filter(Boolean);
-      const colSel = $("columns"); colSel.innerHTML = "";
-      cols.forEach((c) => colSel.appendChild(el("option", { value: c }, c)));
+      colSel.innerHTML = "";
+      cols.forEach((c) => {
+        const o = el("option", { value: c }, c);
+        if (previously.has(c)) o.selected = true;
+        colSel.appendChild(o);
+      });
     };
     sheetSel.onchange = fill; fill();
   }
 
   async function runCheck() {
     $("msgs").innerHTML = "";
+    // Clearing inputs on click (above) can leave one empty if a picker was cancelled.
+    if (!$("excel").files.length || !$("pdf").files.length) {
+      $("msgs").appendChild(banner("err", "Please choose both an Excel and a PDF file."));
+      updateRun();
+      return;
+    }
     const fd = new FormData();
     fd.append("excel", $("excel").files[0]);
     fd.append("pdf", $("pdf").files[0]);
