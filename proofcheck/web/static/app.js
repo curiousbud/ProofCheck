@@ -70,9 +70,9 @@ function banner(kind, msg) { return el("div", { class: `banner ${kind}`, html: m
 // ---- Check view -------------------------------------------------------------
 function checkView() {
   clearView();
-  const ocrNote = state.health && state.health.ocr_available
-    ? '<span class="pill">OCR ready</span>'
-    : '<span class="pill" title="Install proofcheck[ocr] + the Tesseract binary to enable">OCR not installed</span>';
+  // The OCR pill (id="ocrPill") is filled by applyOcrStatus() from the live /api/health,
+  // so restarting the server with OCR installed updates it without a hard page reload.
+  const ocrNote = '<span id="ocrPill" class="pill"></span>';
 
   const root = el("div", {},
     el("div", { class: "panel", html: `
@@ -115,6 +115,35 @@ function checkView() {
   );
   view().appendChild(root);
   wireCheck();
+  applyOcrStatus();          // reflect current (cached) health immediately
+  refreshHealthThenApply();  // then re-check the server in case it was just (re)started
+}
+
+// Update the OCR pill + checkbox from state.health. When OCR isn't available the checkbox
+// is disabled with an explanatory tooltip, so it's clear *why* and how to enable it.
+function applyOcrStatus() {
+  const pill = document.getElementById("ocrPill");
+  if (!pill) return;
+  const ready = !!(state.health && state.health.ocr_available);
+  pill.textContent = ready ? "OCR ready" : "OCR not installed";
+  pill.title = ready
+    ? "Tesseract OCR engine detected on the server."
+    : "Server can't find OCR. Install with: pip install \"proofcheck[ocr]\" + the Tesseract " +
+      "binary, then restart the server. (This pill reflects the server that serves this page.)";
+  pill.style.color = ready ? "var(--exact)" : "var(--missing)";
+  const box = document.getElementById("ocr");
+  if (box) {
+    box.disabled = !ready;
+    if (!ready && box.checked) {
+      box.checked = false;
+      document.getElementById("ocrOpts").classList.add("hidden");
+    }
+  }
+}
+
+async function refreshHealthThenApply() {
+  try { state.health = await api.health(); } catch (_) { /* keep cached health */ }
+  applyOcrStatus();
 }
 
 function wireCheck() {
