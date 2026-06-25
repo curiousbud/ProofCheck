@@ -38,6 +38,8 @@ REPORT_TTL_SECONDS = 60 * 60  # delete generated reports older than 1 hour
 
 EXCEL_EXTS = {".xlsx", ".xlsm"}
 PDF_EXTS = {".pdf"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"}
+DOC_EXTS = PDF_EXTS | IMAGE_EXTS  # /api/check accepts a PDF or a single image
 
 _STATIC_DIR = Path(__file__).parent / "static"
 # Short-lived cache for generated report files, keyed by run_id (download links).
@@ -284,12 +286,13 @@ async def check(
     """Run a full check and return the documented JSON shape + report download URLs."""
     _cleanup_reports()
     _validate_ext(excel.filename, EXCEL_EXTS, "Excel file")
-    _validate_ext(pdf.filename, PDF_EXTS, "PDF file")
+    pdf_ext = _validate_ext(pdf.filename, DOC_EXTS, "PDF or image file")
 
     excel_path = await _save_upload(excel, suffix=".xlsx")
     pdf_path = None
     try:
-        pdf_path = await _save_upload(pdf, suffix=".pdf")
+        # Save with the real extension so the pipeline routes PDFs vs images correctly.
+        pdf_path = await _save_upload(pdf, suffix=pdf_ext)
 
         # Columns arrive as a comma- (or newline-) separated form field.
         col_list = [c.strip() for c in columns.replace("\n", ",").split(",") if c.strip()]

@@ -11,7 +11,8 @@ HTML / xlsx reports plus a swappable web UI.
 - [x] `excel.py` — load workbook, inspect sheets/headers, read column values per row
 - [x] `pdf.py` — per-page text extraction, detect pages with no text layer (warnings), **optional OCR fallback**
 - [x] `ocr.py` — **optional, deterministic Tesseract OCR** for no-text-layer (scanned) pages; graceful no-op when absent
-- [x] `ocr.py` — **robust multi-strategy engine**: grayscale+autocontrast **and Otsu binarization** × multiple page-segmentation modes, keep the most-confident result (fixes psm-3-returns-nothing); LSTM `--oem 3`, configurable `--ocr-psm`; **`diagnose()`** reports per-page text + confidence + winning strategy + saved images
+- [x] `ocr.py` — **robust multi-strategy engine**: grayscale+autocontrast, **Otsu binarization**, and **alpha-channel text mask** (for transparent logo/gradient PNGs) × page-segmentation modes; keep the most *readable* result (confidence-weighted length); early-exit; LSTM `--oem 3`, configurable `--ocr-psm`; **`diagnose()`** reports text + confidence + winning strategy + saved images
+- [x] `images.py` + `document.py` — **image & image-folder input** (each image = one OCR'd page); `check`/`ocr` accept a PDF, an image, or a directory of images; web accepts a single image upload
 - [x] CLI **`proofcheck ocr`** — diagnostics command to verify OCR output/confidence per page
 - [x] `MatchResult.source` (`text`/`OCR`) — surfaced as a **"Matched via"** column in the web UI + HTML + xlsx reports
 - [x] `ocr_cache.py` — **content-addressed OCR cache** (sha256 of file + dpi + lang); unchanged file = cache hit (no re-OCR), changed file = fresh OCR

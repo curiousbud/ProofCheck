@@ -337,3 +337,8 @@ v0.2: mounts `/static` (StaticFiles) for the SPA assets; `/` still serves index.
 
 `/api/check` accepts an `ocr_psm` form field; the serialized match results now include `source` (text/OCR).
 
+
+## v0.2 changes (image input + engine v3)
+
+`/api/check` now accepts a single **image** upload as well as a PDF (`DOC_EXTS` = PDF + image extensions); the upload is saved with its real extension so `document.extract` routes it correctly. A folder of images is a CLI feature (single upload only on the web).
+

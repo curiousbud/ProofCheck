@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from . import excel, pdf
+from . import document, excel, pdf
 from .matcher import match_value
 from .models import (
     ColumnResult,
@@ -64,9 +64,9 @@ def run(config: RunConfig) -> RunResult:
     if not column_data:
         raise PipelineError("No columns to check were found on the sheet.")
 
-    # 2. Extract the PDF text layer (optionally OCR'ing no-text-layer pages).
+    # 2. Extract page text from the input (PDF text layer, or OCR for image input).
     try:
-        pdf_text = pdf.extract(
+        pdf_text = document.extract(
             config.pdf_path,
             ocr=config.ocr,
             ocr_dpi=config.ocr_dpi,

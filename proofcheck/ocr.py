@@ -57,7 +57,7 @@ DEFAULT_OEM = 3          # OCR engine mode: 3 = default (LSTM neural engine).
 # Page-segmentation modes to fall back to (after the requested one). 6 = single uniform
 # block, 4 = variable-size columns: between them they rescue most pages psm 3 misses.
 _PSM_FALLBACKS = (6, 4)
-_CONFIDENT = 40          # word confidence (0-100) counted as "confident text" when scoring.
+_GOOD_CONF = 80          # a result this confident (with text) ends the strategy search early.
 _PDF_POINTS_PER_INCH = 72.0
 
 # Common locations the Tesseract engine lands in when it isn't on PATH (notably the
@@ -86,6 +86,7 @@ class PageDiagnostic:
     strategy: str = ""              # which preprocessing/psm won (e.g. "binary/psm6")
     has_text_layer: bool = False    # True if the page already had embedded text (OCR not needed)
     image_path: str | None = None   # where the rendered page image was saved (if requested)
+    name: str = ""                  # source label for the page (e.g. an image filename)
 
 
 def _configure_tesseract_cmd() -> None:
@@ -177,11 +178,8 @@ def _otsu_threshold(image) -> int:
     return threshold
 
 
-def _render_page(document, page_index: int, *, dpi: int):
-    """Render one page to a grayscale PIL image (flatten transparency onto white)."""
-    scale = dpi / _PDF_POINTS_PER_INCH
-    bitmap = document[page_index].render(scale=scale)
-    image = bitmap.to_pil()
+def _flatten_to_gray(image):
+    """Flatten transparency onto white and return a grayscale ('L') image."""
     if image.mode not in ("L", "RGB"):
         rgba = image.convert("RGBA")
         background = _Image.new("RGB", rgba.size, (255, 255, 255))
@@ -190,25 +188,98 @@ def _render_page(document, page_index: int, *, dpi: int):
     return image.convert("L")
 
 
-def _preprocess_variants(gray):
+def _render_page(document, page_index: int, *, dpi: int):
+    """Render one PDF page to a PIL image (RGB on white; pdfium has no alpha)."""
+    scale = dpi / _PDF_POINTS_PER_INCH
+    return document[page_index].render(scale=scale).to_pil()
+
+
+def _load_image_file(path: str):
+    """Open an image file as a PIL image, preserving its mode (incl. any alpha channel)."""
+    try:
+        with _Image.open(path) as im:
+            im.load()
+            return im.copy()
+    except Exception as exc:
+        raise OcrError(f"Could not open image {os.path.basename(path)}: {exc}") from exc
+
+
+def ocr_image_file(
+    path: str,
+    *,
+    lang: str = DEFAULT_LANG,
+    psm: int = DEFAULT_PSM,
+    oem: int = DEFAULT_OEM,
+) -> str:
+    """OCR a single image file (PNG/JPG/TIFF/...). Returns the recovered text."""
+    if not available():
+        raise OcrError(unavailable_reason() or "OCR is unavailable.")
+    text, _, _, _, _ = _best_ocr(_load_image_file(path), lang=lang, psm=psm, oem=oem)
+    return text or ""
+
+
+def diagnose_image_file(
+    path: str,
+    *,
+    lang: str = DEFAULT_LANG,
+    psm: int = DEFAULT_PSM,
+    oem: int = DEFAULT_OEM,
+    save_dir: str | None = None,
+    page: int = 1,
+) -> PageDiagnostic:
+    """Diagnose OCR on one image file: best text + confidence + winning strategy."""
+    if not available():
+        raise OcrError(unavailable_reason() or "OCR is unavailable.")
+    text, mean_conf, words, label, image_used = _best_ocr(
+        _load_image_file(path), lang=lang, psm=psm, oem=oem
+    )
+    image_path = None
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        image_path = os.path.join(save_dir, f"page-{page}.png")
+        image_used.save(image_path)
+    return PageDiagnostic(
+        page=page, text=text or "", mean_confidence=mean_conf, word_count=words,
+        strategy=label, image_path=image_path, name=os.path.basename(path),
+    )
+
+
+def _preprocess_variants(image):
     """Deterministic preprocessings to try, as ``(name, image)`` pairs.
 
-    'contrast' suits clean digital renders; 'binary' (Otsu) suits noisy/low-contrast scans.
+    'contrast' suits clean digital renders; 'binary' (Otsu) suits noisy/low-contrast scans;
+    'alpha' uses a transparent image's alpha channel directly as the text mask — the cleanest
+    possible input for logos/PNGs with a transparent background (e.g. gradient/outlined text),
+    independent of the fill colour.
     """
+    gray = _flatten_to_gray(image)
     contrast = _ImageOps.autocontrast(gray)
-    threshold = _otsu_threshold(contrast)
-    binary = contrast.point(lambda p: 255 if p > threshold else 0)
-    return [("contrast", contrast), ("binary", binary)]
+    binary = contrast.point(lambda p: 255 if p > _otsu_threshold(contrast) else 0)
+    variants = [("contrast", contrast), ("binary", binary)]
+
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        alpha = image.convert("RGBA").split()[-1]
+        lo, _hi = alpha.getextrema()
+        if lo < 250:  # alpha actually varies (genuine transparency) -> usable text mask
+            variants.append(("alpha", alpha.point(lambda a: 0 if a > 128 else 255)))
+    return variants
 
 
 def _data_to_result(data):
-    """Reduce a pytesseract image_to_data dict to (text, mean_conf, word_count, strong)."""
-    confs = [float(c) for c in data.get("conf", []) if str(c) not in ("-1", "-1.0")]
-    words = [w for w in data.get("text", []) if w and w.strip()]
+    """Reduce a pytesseract image_to_data dict to (text, mean_conf, word_count, mass)."""
+    pairs = [
+        (t.strip(), float(c))
+        for t, c in zip(data.get("text", []), data.get("conf", []))
+        if t and t.strip() and str(c) not in ("-1", "-1.0")
+    ]
+    words = [t for t, _ in pairs]
+    confs = [c for _, c in pairs]
     text = " ".join(words)
     mean_conf = round(sum(confs) / len(confs), 1) if confs else 0.0
-    strong = sum(c for c in confs if c >= _CONFIDENT)  # amount of confident text
-    return text, mean_conf, len(words), strong
+    # "Readable mass": characters weighted by confidence. Prefers substantial readable text
+    # over a short high-confidence fragment, while still down-weighting low-confidence noise.
+    mass = sum(len(w) * c for w, c in pairs)
+    return text, mean_conf, len(words), mass
 
 
 def _best_ocr(image, *, lang: str, psm: int, oem: int):
@@ -224,17 +295,23 @@ def _best_ocr(image, *, lang: str, psm: int, oem: int):
     for p in (psm, *_PSM_FALLBACKS):
         if p not in psms:
             psms.append(p)
+    variants = _preprocess_variants(image)
 
-    best = None  # (strong, words, text, mean_conf, label, image)
-    for prep_name, prep_img in _preprocess_variants(image):
-        for ps in psms:
+    best = None  # (mass, words, text, mean_conf, label, image)
+    # Outer loop over page-segmentation modes so the requested mode is tried across every
+    # preprocessing first; only escalate to fallback modes if no confident read yet. This
+    # bounds the common case to a few Tesseract passes while staying deterministic.
+    for ps in psms:
+        for prep_name, prep_img in variants:
             cfg = f"--oem {int(oem)} --psm {int(ps)}"
             data = _pytesseract.image_to_data(prep_img, lang=lang, config=cfg, output_type=Output.DICT)
-            text, mean_conf, words, strong = _data_to_result(data)
-            cand = (strong, words, text, mean_conf, f"{prep_name}/psm{ps}", prep_img)
+            text, mean_conf, words, mass = _data_to_result(data)
+            cand = (mass, words, text, mean_conf, f"{prep_name}/psm{ps}", prep_img)
             if best is None or (cand[0], cand[1]) > (best[0], best[1]):
                 best = cand
-    _strong, words, text, mean_conf, label, image_used = best
+        if best is not None and best[3] >= _GOOD_CONF and best[1] >= 1:
+            break  # confident result with real text — no need to try more segmentation modes
+    _mass, words, text, mean_conf, label, image_used = best
     return text, mean_conf, words, label, image_used
 
 

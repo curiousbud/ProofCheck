@@ -122,3 +122,8 @@ Error handling: a `PdfError` raised inside is re-raised unchanged (`except PdfEr
 
 `PdfText` gained `ocr_from_cache`. `_apply_ocr` now consults `ocr_cache` first (keyed by sha256 of the file + dpi + lang): an identical file reuses cached OCR text with no re-OCR and without even needing the engine; a changed file (different hash) is OCR'd fresh and stored. `warnings()` distinguishes cache reuse ('file unchanged') from fresh OCR. See ocr_cache_EXPLAINED.md.
 
+
+## v0.2 changes (image input + engine v3)
+
+`PdfText.warnings()` text uses ASCII hyphens (not em dashes) so it prints cleanly on legacy consoles.
+

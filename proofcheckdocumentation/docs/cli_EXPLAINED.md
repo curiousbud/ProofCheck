@@ -259,3 +259,8 @@ IMPORT_EDGES: proofcheck.cli -> proofcheck (__version__); proofcheck.cli -> proo
 
 New `proofcheck ocr PDF` diagnostics command: prints recovered text + mean confidence per page (flags low-confidence), with `--pages`/`--all-pages`, `--ocr-lang/--ocr-dpi/--ocr-psm`, `--save-images DIR` (dump the images fed to Tesseract), and `--full-text`. `check` also gained `--ocr-psm` (page-segmentation mode).
 
+
+## v0.2 changes (image input + engine v3)
+
+`check` and `ocr` now accept a PDF, a single image, OR a directory of images (PDF_PATH arg is `dir_okay=True`). The `ocr` command branches on `images.is_image_input`: for images it lists files, labels each page with its filename, and uses `ocr.diagnose_image_file`; it prints a per-run low-confidence count. (`import os` added.)
+

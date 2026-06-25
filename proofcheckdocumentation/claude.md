@@ -66,7 +66,9 @@ Proof-Reader/
 │   ├── normalize.py              · deterministic text normalization (casefold, ws, digits, punct)
 │   ├── excel.py                  · workbook load + inspect (openpyxl)
 │   ├── pdf.py                    · per-page text extraction; flags no-text-layer pages; optional OCR fallback
-│   ├── ocr.py                    · OPTIONAL deterministic Tesseract OCR for scanned pages (graceful no-op if absent)
+│   ├── images.py                 · image / image-folder input — each image is one OCR'd page
+│   ├── document.py               · input dispatcher: route PDF vs image input to the right extractor
+│   ├── ocr.py                    · OPTIONAL deterministic Tesseract OCR (multi-strategy; graceful no-op if absent)
 │   ├── ocr_cache.py              · content-addressed OCR cache (sha256) — never OCR the same file twice
 │   ├── matcher.py                · exact/fuzzy/missing/skipped + [op,text] diff   ← CORE LOGIC
 │   ├── pipeline.py               · run(RunConfig) -> RunResult                    ← SHARED ORCHESTRATION
@@ -156,7 +158,9 @@ Each link is a line-by-line explainer (logic, functions, key variables, dependen
 | `proofcheck/normalize.py` | [normalize_EXPLAINED.md](docs/normalize_EXPLAINED.md) | Deterministic normalization |
 | `proofcheck/excel.py` | [excel_EXPLAINED.md](docs/excel_EXPLAINED.md) | Excel load / inspect |
 | `proofcheck/pdf.py` | [pdf_EXPLAINED.md](docs/pdf_EXPLAINED.md) | PDF text extraction (+ optional OCR fallback) |
-| `proofcheck/ocr.py` | [ocr_EXPLAINED.md](docs/ocr_EXPLAINED.md) | Optional deterministic Tesseract OCR |
+| `proofcheck/images.py` | [images_EXPLAINED.md](docs/images_EXPLAINED.md) | Image / image-folder input (OCR each) |
+| `proofcheck/document.py` | [document_EXPLAINED.md](docs/document_EXPLAINED.md) | Input dispatcher (PDF vs images) |
+| `proofcheck/ocr.py` | [ocr_EXPLAINED.md](docs/ocr_EXPLAINED.md) | Optional deterministic Tesseract OCR (multi-strategy) |
 | `proofcheck/ocr_cache.py` | [ocr_cache_EXPLAINED.md](docs/ocr_cache_EXPLAINED.md) | Content-addressed OCR cache (skip unchanged files) |
 | `proofcheck/matcher.py` | [matcher_EXPLAINED.md](docs/matcher_EXPLAINED.md) | Matching + diff (core logic) |
 | `proofcheck/pipeline.py` | [pipeline_EXPLAINED.md](docs/pipeline_EXPLAINED.md) | Shared orchestration |
@@ -201,7 +205,7 @@ the project's core contract.
 
 ### Current state (as of this guide)
 - Full core engine, CLI, web API + SPA, reports, and tests are implemented (v0.2.0).
-- **54 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
+- **57 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
 - v0.2 added: **optional deterministic OCR** fallback (`ocr.py`) with a **content-addressed
   cache** (`ocr_cache.py`, never OCR an unchanged file twice), **diacritic folding**
   (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), **opt-in auth +
@@ -256,11 +260,17 @@ PROOFCHECK_AUTH=on PROOFCHECK_ADMIN_USER=admin PROOFCHECK_ADMIN_PASSWORD=secret1
 - **OCR is cached by content** (`ocr_cache.py`): keyed by `sha256(file)+dpi+lang+psm`, so an
   unchanged file is never OCR'd twice and a changed file (different hash) is OCR'd fresh.
   The cache is an optimization only — it returns exactly what OCR would have produced.
-- **OCR engine tuning** lives in `ocr.py`: pages are rendered then preprocessed
-  deterministically (flatten→grayscale→autocontrast) and recognized with LSTM (`--oem 3`) and
-  a configurable page-segmentation mode (`--ocr-psm`, default 3). `ocr.diagnose()` (and the
-  `proofcheck ocr` CLI command) report per-page text + mean confidence and can dump the
-  rendered images — the way to verify OCR quality. Keep all of this deterministic.
+- **OCR engine** (`ocr.py`) is **multi-strategy + deterministic**: per page it tries several
+  preprocessings (flatten→grayscale→autocontrast, Otsu **binary**, and — for transparent
+  images — the **alpha channel as the text mask**) × page-segmentation modes, and keeps the
+  most *readable* result (confidence-weighted text length, so a full name beats a short
+  high-confidence fragment). It early-exits once a confident read is found (bounded passes).
+  `ocr.diagnose()` / `proofcheck ocr` report per-page text + confidence + winning strategy and
+  can dump the images fed to OCR. Hard limit: stylized 3D/metallic *display* fonts are beyond
+  Tesseract — low confidence is the signal.
+- **Image input** (`images.py` + `document.py`): a single image or a **folder of images**
+  (each image = one OCR'd page, sorted) is a valid document anywhere a PDF is. `pipeline.run`
+  calls `document.extract`, which routes PDF vs image input. Images always require OCR.
 - **Each `MatchResult` carries `source`** (`"text"` | `"OCR"` | None): whether the matched
   page's text came from the embedded text layer or from OCR. `pipeline.run` sets it from
   `pdf_text.ocr_pages`; the reports/SPA show it as a **"Matched via"** column.

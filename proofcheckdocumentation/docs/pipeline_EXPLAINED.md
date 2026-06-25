@@ -189,3 +189,8 @@ For each loaded column, a `ColumnResult` is created and each `(row_num, value)` 
 
 `run` now passes `ocr_psm` to `pdf.extract` and, after matching, sets each `MatchResult.source` to 'OCR' or 'text' based on whether its matched page is in `pdf_text.ocr_pages`.
 
+
+## v0.2 changes (image input + engine v3)
+
+`run` now calls `document.extract` (not `pdf.extract`) so the same run handles a PDF, an image, or a folder of images; image inputs are OCR'd with each image as one page. The text-layer-vs-OCR `source` logic is unchanged (image pages are all `ocr_pages` -> source 'OCR').
+

@@ -7,9 +7,11 @@ monkeypatched success path that exercises the wiring without needing the engine.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
-from proofcheck import ocr, ocr_cache, pdf
+from proofcheck import document, images, ocr, ocr_cache, pdf
 from proofcheck.models import RunConfig, Status
 from proofcheck.pipeline import run
 
@@ -129,6 +131,61 @@ def test_ocr_cache_can_be_disabled(pdf_path, monkeypatch):
     pdf.extract(pdf_path, ocr=True)
     pdf.extract(pdf_path, ocr=True)
     assert calls["n"] == 2  # no caching -> OCR runs every time
+
+
+def _make_png(path):
+    from PIL import Image
+    Image.new("RGB", (40, 20), "white").save(path)
+
+
+def test_image_input_detection(tmp_path):
+    d = tmp_path / "imgs"
+    d.mkdir()
+    _make_png(d / "a.png")
+    assert images.is_image_file(str(d / "a.png"))
+    assert images.is_image_dir(str(d))
+    assert document.is_image_input(str(d))
+    assert not document.is_image_input("nope.pdf")
+    assert images.list_images(str(d)) == [str(d / "a.png")]
+
+
+def test_image_folder_pipeline_matches_and_marks_ocr(excel_path, tmp_path, monkeypatch):
+    # Two images; OCR is monkeypatched so the test needs no Tesseract engine.
+    d = tmp_path / "imgs"
+    d.mkdir()
+    _make_png(d / "a.png")
+    _make_png(d / "b.png")
+    text_by_name = {"a.png": "", "b.png": "Priya Nair CC-102 Delhi"}
+
+    # The two blank PNGs are byte-identical, so disable the content cache (otherwise the
+    # second image correctly reuses the first's cached OCR result).
+    monkeypatch.setenv("PROOFCHECK_OCR_CACHE", "off")
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "ocr_image_file",
+                        lambda path, **kw: text_by_name[os.path.basename(path)])
+
+    # images.extract: one page per image, sorted; the text page is recorded as OCR.
+    pt = images.extract(str(d))
+    assert pt.page_count == 2
+    assert pt.ocr_pages == [2] and pt.empty_pages == [1]
+
+    # End-to-end via the pipeline: a name in image b matches, and is marked source="OCR".
+    result = run(RunConfig(excel_path=excel_path, pdf_path=str(d),
+                           columns=["Name"], sheet="Delegates"))
+    by_expected = {r.expected: r for r in result.columns[0].results}
+    assert by_expected["Priya Nair"].status is Status.EXACT
+    assert by_expected["Priya Nair"].source == "OCR"
+
+
+def test_image_input_without_engine_degrades(tmp_path, monkeypatch):
+    d = tmp_path / "imgs"
+    d.mkdir()
+    _make_png(d / "a.png")
+    monkeypatch.setattr(ocr, "available", lambda: False)
+    monkeypatch.setattr(ocr, "unavailable_reason", lambda: "engine missing for test")
+    pt = images.extract(str(d))
+    assert pt.empty_pages == [1]
+    assert pt.ocr_unavailable_reason == "engine missing for test"
 
 
 def test_pipeline_ocr_flag_recorded_in_meta(excel_path, pdf_path):

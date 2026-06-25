@@ -98,6 +98,7 @@ const NODES = [
   { id:"pdf.py",           doc:"docs/pdf_EXPLAINED.md",               kind:"leaf",   col:0, label:"pdf.py",           sub:"pdfplumber text" },
   { id:"ocr.py",           doc:"docs/ocr_EXPLAINED.md",               kind:"leaf",   col:0, label:"ocr.py",           sub:"OCR fallback (opt)" },
   { id:"ocr_cache.py",     doc:"docs/ocr_cache_EXPLAINED.md",         kind:"leaf",   col:0, label:"ocr_cache.py",     sub:"OCR cache (sha256)" },
+  { id:"images.py",        doc:"docs/images_EXPLAINED.md",            kind:"leaf",   col:0, label:"images.py",        sub:"image-folder input" },
   { id:"humanize.py",      doc:"docs/humanize_EXPLAINED.md",          kind:"leaf",   col:0, label:"humanize.py",      sub:"plain-language wording" },
   { id:"__init__.py",      doc:"docs/proofcheck_init_EXPLAINED.md",   kind:"leaf",   col:0, label:"__init__.py",      sub:"version marker" },
   { id:"web/schemas.py",   doc:"docs/web_schemas_EXPLAINED.md",       kind:"schema", col:0, label:"web/schemas.py",   sub:"SWAP CONTRACT" },
@@ -108,6 +109,7 @@ const NODES = [
   { id:"report_html.py",   doc:"docs/report_html_EXPLAINED.md",       kind:"logic",  col:1, label:"report_html.py",   sub:"HTML report" },
   { id:"report_xlsx.py",   doc:"docs/report_xlsx_EXPLAINED.md",       kind:"logic",  col:1, label:"report_xlsx.py",   sub:"xlsx report" },
   { id:"web/auth.py",      doc:"docs/web_auth_EXPLAINED.md",          kind:"logic",  col:1, label:"web/auth.py",      sub:"auth + sessions" },
+  { id:"document.py",      doc:"docs/document_EXPLAINED.md",          kind:"logic",  col:1, label:"document.py",      sub:"PDF/image router" },
   // Orchestration (col 2)
   { id:"pipeline.py",      doc:"docs/pipeline_EXPLAINED.md",          kind:"entry",  col:2, label:"pipeline.py",      sub:"run(RunConfig)" },
   // Entry points (col 3)
@@ -139,6 +141,12 @@ const EDGES = [
   { from:"pipeline.py",    to:"models.py" },
   { from:"pdf.py",         to:"ocr.py", kind:"lazy" },            // OCR fallback imported inside _apply_ocr
   { from:"pdf.py",         to:"ocr_cache.py", kind:"lazy" },      // cache consulted inside _apply_ocr
+  { from:"document.py",    to:"pdf.py" },
+  { from:"document.py",    to:"images.py" },
+  { from:"images.py",      to:"pdf.py" },                         // returns PdfText
+  { from:"images.py",      to:"ocr.py", kind:"lazy" },            // OCRs each image
+  { from:"images.py",      to:"ocr_cache.py", kind:"lazy" },
+  { from:"pipeline.py",    to:"document.py" },
   { from:"report_html.py", to:"humanize.py" },
   { from:"report_xlsx.py", to:"humanize.py" },
   { from:"web/auth.py",    to:"web/store.py" },

@@ -44,11 +44,16 @@ All normalization is deterministic and applied to both sides before comparison:
   (`pypdfium2`) and read with the offline **Tesseract** engine — a fixed glyph recognizer,
   so the same image at the same DPI always yields the same text. It recovers real glyphs;
   it never *guesses*.
+- **Works on images too.** Point `check` at a single image or a **folder of images** (PNG/
+  JPG/TIFF/…) — each image is treated as a one-page scan and OCR'd. See *Input formats* above.
 - **Tuned for accuracy & robustness.** Each page is preprocessed deterministically (flatten
-  onto white → grayscale → auto-contrast, plus **Otsu binarization** for noisy scans) and
-  OCR is tried with **several strategies** — two preprocessings × multiple page-segmentation
-  modes — keeping the **most confident** result. (This also fixes a real failure mode where
-  automatic segmentation returns nothing on sparse pages.) Recognition uses the LSTM engine.
+  onto white → grayscale → auto-contrast, **Otsu binarization** for noisy scans, and — for
+  transparent images — the **alpha channel used directly as the text mask**, which nails
+  outlined/gradient logo text). OCR is tried with **several strategies** (preprocessings ×
+  page-segmentation modes) and the **most readable** result wins — scored by confidence-
+  weighted text length, so a full name beats a short high-confidence fragment. (This also
+  fixes a real failure mode where automatic segmentation returns nothing on sparse pages.)
+  Recognition uses the LSTM engine.
 - Tunable: **`--ocr-lang`** (e.g. `eng+ara`), **`--ocr-dpi`** (default 300; raise for small
   text), and **`--ocr-psm`** (page layout: auto / single block / columns / sparse).
 - **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text, **mean confidence**,
@@ -121,7 +126,7 @@ All normalization is deterministic and applied to both sides before comparison:
   JSON contract (`web/schemas.py`).
 - **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
   create a virtualenv, install the package, and run the tests in one command.
-- **Deterministic test suite** (54 tests) with fixtures generated on the fly — no committed
+- **Deterministic test suite** (57 tests) with fixtures generated on the fly — no committed
   binaries. OCR tests pass with or without the engine installed.
 
 ---
@@ -193,7 +198,17 @@ proofcheck ocr scan.pdf --full-text --save-images ./ocr-debug
 
 # Check every column
 proofcheck check delegates.xlsx program.pdf --all-columns
+
+# Input can also be an IMAGE or a FOLDER of images (each image = one page; always OCR'd)
+proofcheck check delegates.xlsx ./scans/            # a folder of .png/.jpg/.tiff/…
+proofcheck check delegates.xlsx logo.png -c "Name"  # a single image
+proofcheck ocr ./scans/ --full-text                 # diagnose OCR over the whole folder
 ```
+
+**Input formats:** the document argument accepts a **PDF**, a **single image**
+(`.png/.jpg/.jpeg/.tif/.tiff/.bmp/.webp/.gif`), or a **directory of images** (each image is
+one page, in sorted filename order). Images are always OCR'd (no text layer), so they need
+the OCR engine installed. The web UI accepts a PDF or a single image upload.
 
 The **`proofcheck ocr`** command is the quickest way to verify OCR quality: it prints each
 page's recovered text and a **mean confidence** (flagging low-confidence pages), and with
@@ -367,6 +382,8 @@ proofcheck/
   normalize.py     # deterministic text normalization (casefold, digits, punct, diacritics)
   excel.py         # workbook load + inspect (openpyxl)
   pdf.py           # per-page text extraction (pdfplumber) + optional OCR fallback
+  images.py        # image / image-folder input (each image = one OCR'd page)
+  document.py      # input dispatcher: routes PDFs vs images to the right extractor
   ocr.py           # OPTIONAL deterministic Tesseract OCR (graceful no-op if absent)
   matcher.py       # exact/fuzzy/missing/skipped + [op,text] diff
   pipeline.py      # SHARED orchestration: run(RunConfig) -> RunResult
@@ -389,7 +406,7 @@ Full per-file deep-dives live in [`proofcheckdocumentation/`](proofcheckdocument
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 54 tests
+pytest          # 57 tests
 ```
 
 OCR tests cover both the real graceful-degradation path and a monkeypatched recovery path,

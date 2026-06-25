@@ -54,13 +54,13 @@ class PdfText:
         for p in self.ocr_pages:
             if self.ocr_from_cache:
                 msgs.append(
-                    f"Page {p} had no text layer — reused OCR text from an earlier run of "
+                    f"Page {p} had no text layer - reused OCR text from an earlier run of "
                     f"this identical file (file unchanged, so OCR was skipped)."
                 )
             else:
-                msgs.append(f"Page {p} had no text layer — text recovered via OCR.")
+                msgs.append(f"Page {p} had no text layer - text recovered via OCR.")
         for p in self.empty_pages:
-            msgs.append(f"Page {p} has no text layer — OCR required, skipped.")
+            msgs.append(f"Page {p} has no text layer - OCR required, skipped.")
         return msgs
 
 

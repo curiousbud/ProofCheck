@@ -79,8 +79,8 @@ function checkView() {
       <div class="row">
         <div class="field"><label for="excel">Excel file (.xlsx / .xlsm)</label>
           <input type="file" id="excel" accept=".xlsx,.xlsm"></div>
-        <div class="field"><label for="pdf">PDF file (.pdf)</label>
-          <input type="file" id="pdf" accept=".pdf"></div>
+        <div class="field"><label for="pdf">PDF or image (.pdf / .png / .jpg …)</label>
+          <input type="file" id="pdf" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif"></div>
       </div>
       <div class="row">
         <div class="field" style="max-width:240px;"><label for="sheet">Sheet</label>

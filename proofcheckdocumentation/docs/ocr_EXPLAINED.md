@@ -102,3 +102,8 @@ on a sparse page. `PageDiagnostic` gained a `strategy` label (e.g. `binary/psm6`
 (amortized by the OCR cache). Hard limit: heavily stylized display/logo fonts (3D, metallic,
 outlined) are at/beyond Tesseract's ability regardless of preprocessing — low confidence is
 the signal.
+
+## v0.2 changes (image input + engine v3)
+
+Engine v3: `_preprocess_variants` now also emits an **alpha** variant for transparent images (uses the alpha channel directly as a black-on-white text mask — nails outlined/gradient logo PNGs). Scoring switched from 'sum of high-confidence words' to **readable mass** (sum of word length x confidence) so a full lower-confidence name beats a short high-confidence fragment. `_best_ocr` loops page-segmentation-mode-outer with an **early exit** once a confident read (mean conf >= 80, >=1 word) is found, bounding passes. New `ocr_image_file` / `diagnose_image_file` / `_load_image_file` handle loose image files; `_render_page` now returns the raw render and `_flatten_to_gray` is shared. `PageDiagnostic` gained `name` (image filename).
+
