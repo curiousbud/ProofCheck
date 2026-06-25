@@ -44,13 +44,19 @@ All normalization is deterministic and applied to both sides before comparison:
   (`pypdfium2`) and read with the offline **Tesseract** engine — a fixed glyph recognizer,
   so the same image at the same DPI always yields the same text. It recovers real glyphs;
   it never *guesses*.
-- **Tuned for accuracy.** Pages are preprocessed deterministically before OCR — flattened
-  onto white, converted to grayscale, and auto-contrasted (the clean input Tesseract reads
-  best) — and recognized with the LSTM engine.
+- **Tuned for accuracy & robustness.** Each page is preprocessed deterministically (flatten
+  onto white → grayscale → auto-contrast, plus **Otsu binarization** for noisy scans) and
+  OCR is tried with **several strategies** — two preprocessings × multiple page-segmentation
+  modes — keeping the **most confident** result. (This also fixes a real failure mode where
+  automatic segmentation returns nothing on sparse pages.) Recognition uses the LSTM engine.
 - Tunable: **`--ocr-lang`** (e.g. `eng+ara`), **`--ocr-dpi`** (default 300; raise for small
   text), and **`--ocr-psm`** (page layout: auto / single block / columns / sparse).
-- **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text + confidence per page;
-  `--save-images` dumps what Tesseract saw.
+- **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text, **mean confidence**,
+  and the winning **strategy** per page; `--save-images DIR` dumps exactly what Tesseract saw.
+- **Limits.** Tesseract is trained on ordinary document fonts. Heavily stylized **display /
+  logo lettering** (3D, metallic/gradient, outlined, decorative) is at or beyond its limits —
+  low confidence on such a page (visible via `proofcheck ocr`) means the artwork itself is
+  the problem, not a fixable setting. For those, use a cleaner scan or a text-layer PDF.
 - **Cached by content — never OCR the same file twice.** OCR text is cached keyed by a
   SHA-256 of the file's bytes. Re-uploading the **same** PDF is a cache hit (no OCR, no
   engine needed); a file whose data **changed** gets a different hash and is OCR'd fresh.

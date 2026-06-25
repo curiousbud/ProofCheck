@@ -211,7 +211,7 @@ def ocr(
         flag = "  [!] low confidence" if d.word_count and d.mean_confidence < 60 else ""
         click.echo("")
         click.echo(f"-- Page {d.page}{layer_note} -- confidence {d.mean_confidence:.1f}%, "
-                   f"{d.word_count} word(s){flag}")
+                   f"{d.word_count} word(s), strategy {d.strategy}{flag}")
         if d.image_path:
             click.echo(f"   image: {d.image_path}")
         snippet = d.text.strip()

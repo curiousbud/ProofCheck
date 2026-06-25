@@ -170,6 +170,7 @@ def test_diagnose_reports_text_and_confidence(pdf_path, tmp_path):
     for d in diags:
         assert isinstance(d.mean_confidence, float)
         assert d.word_count >= 0
+        assert d.strategy  # the winning preprocess/psm strategy is reported
         assert d.image_path and __import__("os").path.isfile(d.image_path)  # rendered image saved
 
 

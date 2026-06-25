@@ -89,3 +89,16 @@ The single public workhorse. It guards on `available()`, computes the render sca
 
 Engine improvements: pages are now rendered then preprocessed deterministically by `_render_page` (flatten transparency onto white, convert to grayscale, autocontrast) before Tesseract, recognized with LSTM (`--oem 3`) and a configurable page-segmentation mode (`psm`, default 3). New `diagnose(path, pages, ..., save_dir=None)` returns `PageDiagnostic` (text, mean_confidence, word_count, image_path) for verifying OCR quality; `version()` reports the engine version. `ocr_pages` gained `psm`/`oem` params.
 
+
+## v0.2 changes (robust multi-strategy engine)
+
+OCR now tries several deterministic strategies per page and keeps the most confident result
+(`_best_ocr`): two preprocessings — grayscale+autocontrast and **Otsu binarization**
+(`_otsu_threshold`, pure-Python, no numpy) — times the requested `psm` plus single-block
+(6) and columns (4) fallbacks. Selection is by amount of *confident* text (words with conf
+>= 40), which fixes the failure mode where psm 3 returns nothing yet reports ~95% confidence
+on a sparse page. `PageDiagnostic` gained a `strategy` label (e.g. `binary/psm6`) and
+`diagnose` saves the winning preprocessed image. Note: up to ~6 Tesseract passes per page
+(amortized by the OCR cache). Hard limit: heavily stylized display/logo fonts (3D, metallic,
+outlined) are at/beyond Tesseract's ability regardless of preprocessing — low confidence is
+the signal.
