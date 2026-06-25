@@ -54,6 +54,9 @@ Proof-Reader/
 ├── README.md                     ← user-facing usage / API contract
 ├── TASKS.md                      ← build checklist + v2 roadmap
 ├── pyproject.toml                ← pinned deps, `proofcheck` console script, [ocr] extra
+├── Dockerfile / docker-compose.yml / .dockerignore  ← production container (incl. Tesseract)
+├── DEPLOYMENT.md                 ← deploy guide (Docker, Cloud Run, Render, Fly, Netlify/Vercel, …)
+├── deploy/                       ← platform configs: netlify.toml, vercel.json, render.yaml, fly.toml, heroku.yml
 ├── scripts/                      ← cross-OS setup (setup.sh / setup.ps1): Tesseract + venv + install
 ├── docs/                         ← per-file "_EXPLAINED.md" deep-dives (this guide links them)
 │

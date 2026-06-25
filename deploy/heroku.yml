@@ -1,0 +1,16 @@
+# Heroku — container deploy of the FULL ProofCheck app (with OCR).
+#
+#   heroku create your-proofcheck
+#   heroku stack:set container -a your-proofcheck
+#   git push heroku Areeb:main
+#   heroku config:set PROOFCHECK_SECRET=$(python -c "import secrets;print(secrets.token_hex(32))")
+#
+# NOTE: Heroku's filesystem is EPHEMERAL — the sqlite auth/history DB and OCR cache are
+# wiped on every dyno restart/deploy. Fine for stateless/anonymous use; for persistent
+# history use a host with a real disk (Render/Fly/Cloud Run+volume/VPS — see DEPLOYMENT.md).
+
+build:
+  docker:
+    web: Dockerfile
+run:
+  web: uvicorn proofcheck.web.app:app --host 0.0.0.0 --port $PORT

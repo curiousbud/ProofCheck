@@ -1,0 +1,40 @@
+# Netlify hosts the ProofCheck SPA (static) and PROXIES the API to a backend you run
+# elsewhere (Docker / Cloud Run / Render / Fly / VPS — anything from DEPLOYMENT.md).
+# Netlify cannot run the Python backend or Tesseract, so the backend lives off-Netlify.
+#
+# 1) Deploy your backend somewhere and note its HTTPS URL.
+# 2) Replace BACKEND below with that URL (no trailing slash).
+# 3) Point this file at the repo (or copy it to the repo root) and deploy to Netlify.
+#
+# Because Netlify proxies /api and /reports server-side, the browser still sees same-origin
+# requests, so the session cookie keeps working on your Netlify domain.
+
+[build]
+  publish = "proofcheck/web/static"
+  command = ""
+
+# index.html references /static/app.js and /static/app.css, but those files live at the
+# publish root — map /static/* back to the root.
+[[redirects]]
+  from = "/static/*"
+  to = "/:splat"
+  status = 200
+
+# Proxy the JSON API and report downloads to the real backend.
+[[redirects]]
+  from = "/api/*"
+  to = "https://BACKEND.example.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/reports/*"
+  to = "https://BACKEND.example.com/reports/:splat"
+  status = 200
+  force = true
+
+# SPA fallback.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

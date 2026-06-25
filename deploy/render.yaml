@@ -1,0 +1,27 @@
+# Render Blueprint — runs the FULL ProofCheck app (with OCR) from the Dockerfile.
+# Commit this file, then in Render: New → Blueprint, point at the repo.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: proofcheck
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter            # OCR is CPU/RAM hungry; bump if you OCR large PDFs
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PROOFCHECK_SECRET
+        generateValue: true          # stable random HMAC key for sessions
+      - key: PROOFCHECK_AUTH
+        value: "off"                 # set "on" to require login
+      - key: MAX_UPLOAD_MB
+        value: "25"
+      - key: PROOFCHECK_DB
+        value: /data/proofcheck.db
+      - key: PROOFCHECK_OCR_CACHE
+        value: /data/ocr_cache
+    disk:
+      name: proofcheck-data          # persists auth/history + OCR cache
+      mountPath: /data
+      sizeGB: 1

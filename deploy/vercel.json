@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "//": "Vercel hosts the ProofCheck SPA (static) and rewrites the API to a backend you run elsewhere. Vercel cannot run the Python backend with the Tesseract binary, so the backend lives off-Vercel. Replace BACKEND.example.com with your backend's HTTPS host. Set 'Framework Preset: Other', no build command, output dir = proofcheck/web/static.",
+  "outputDirectory": "proofcheck/web/static",
+  "rewrites": [
+    { "source": "/static/(.*)", "destination": "/$1" },
+    { "source": "/api/(.*)", "destination": "https://BACKEND.example.com/api/$1" },
+    { "source": "/reports/(.*)", "destination": "https://BACKEND.example.com/reports/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

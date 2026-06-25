@@ -316,6 +316,21 @@ each run.
 
 ---
 
+## Deploying
+
+ProofCheck is a Python/FastAPI server (it needs the Tesseract binary for OCR and a writable
+filesystem), so it runs on container/PaaS/VPS hosts. The repo ships a production
+[`Dockerfile`](Dockerfile), [`docker-compose.yml`](docker-compose.yml), and ready configs in
+[`deploy/`](deploy/) for Render, Fly.io, Heroku, Netlify, and Vercel.
+
+```bash
+docker compose up --build -d     # full app (incl. OCR) on http://localhost:8000
+```
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for step-by-step guides: Docker, Cloud Run, Render,
+Railway, Fly.io, Heroku, AWS, Azure, DigitalOcean, a plain VPS (systemd + nginx), and using
+Netlify/Vercel for the SPA with the API proxied to your backend.
+
 ## Project layout
 
 ```

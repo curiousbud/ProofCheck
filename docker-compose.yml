@@ -1,0 +1,32 @@
+# ProofCheck — local / single-host deployment with Docker Compose.
+#
+#   docker compose up --build -d        # start
+#   docker compose logs -f              # tail logs
+#   docker compose down                 # stop (named volume + its data are kept)
+#
+# Generate a stable secret once:  python -c "import secrets; print(secrets.token_hex(32))"
+
+services:
+  proofcheck:
+    build: .
+    image: proofcheck:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # --- Security / sessions -------------------------------------------------
+      PROOFCHECK_SECRET: "CHANGE-ME-to-a-long-random-hex"  # stable HMAC key for sessions
+      PROOFCHECK_AUTH: "off"                                # "on" to require login
+      # PROOFCHECK_ADMIN_USER: "admin"                      # bootstrap admin (auth on)
+      # PROOFCHECK_ADMIN_PASSWORD: "change-me-now"
+      # --- Limits / CORS -------------------------------------------------------
+      MAX_UPLOAD_MB: "25"
+      # CORS_ORIGINS: "https://proofcheck.example.com"
+      # --- Persistence (kept on the volume below) ------------------------------
+      PROOFCHECK_DB: "/data/proofcheck.db"
+      PROOFCHECK_OCR_CACHE: "/data/ocr_cache"
+    volumes:
+      - proofcheck-data:/data          # auth/history DB + OCR cache survive restarts
+    restart: unless-stopped
+
+volumes:
+  proofcheck-data:

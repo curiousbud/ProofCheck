@@ -50,6 +50,7 @@ HTML / xlsx reports plus a swappable web UI.
 ## Packaging & tests
 - [x] `pyproject.toml` — pinned deps, `proofcheck` console script, **optional `[ocr]` extra**
 - [x] `scripts/setup.sh` + `scripts/setup.ps1` — **cross-OS setup**: install Tesseract engine, venv, `pip install -e ".[dev,ocr]"`, run tests
+- [x] **Deployment**: production `Dockerfile` + `docker-compose.yml` + `.dockerignore`; `deploy/` configs (Netlify, Vercel, Render, Fly.io, Heroku); `DEPLOYMENT.md` guide (Docker, Cloud Run, Render, Railway, Fly, Heroku, AWS, Azure, DO, VPS)
 - [x] `tests/conftest.py` — generates Excel + PDF fixtures (deterministic) + per-test isolated sqlite DB
 - [x] `test_normalize.py` (incl. diacritic folding), `test_matcher.py`, `test_pipeline.py`
 - [x] `test_ocr.py` — OCR graceful-degradation + monkeypatched recovery + flag echo
