@@ -290,3 +290,8 @@ RUNTIME_EDGES: POST /api/inspect, POST /api/check, GET /reports/... (HTML + xlsx
 
 The disposable UI is now a framework-free SPA across three files: `index.html` (shell + nav + view mount), `app.js` (hash router + Login/Check/History views + `/api/*` client), and `app.css` (status palette shared with the reports). Still no framework, no build, no CDN; it only speaks `/api/*` and is replaceable wholesale (e.g. with a bundled React build).
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+Results table gained a 'Matched via' column (Text layer / OCR badge per row, `sourceBadge`), a legend entry, and an OCR page-layout (PSM) selector that posts `ocr_psm`.
+

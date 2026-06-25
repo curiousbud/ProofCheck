@@ -105,6 +105,13 @@ function checkView() {
           <input type="text" id="ocr_lang" value="eng" placeholder="eng+ara"></div>
         <div class="field" style="max-width:140px;"><label for="ocr_dpi">OCR DPI</label>
           <input type="number" id="ocr_dpi" value="300" min="72" max="1200" step="50"></div>
+        <div class="field" style="max-width:220px;"><label for="ocr_psm">Page layout (PSM)</label>
+          <select id="ocr_psm">
+            <option value="3" selected>Automatic (3)</option>
+            <option value="6">Single block (6)</option>
+            <option value="4">Columns (4)</option>
+            <option value="11">Sparse text (11)</option>
+          </select></div>
       </div>
       <div style="margin-top:1rem;">
         <button class="primary" id="run" disabled>Run check</button>
@@ -218,6 +225,7 @@ function wireCheck() {
     fd.append("ocr", $("ocr").checked);
     fd.append("ocr_lang", $("ocr_lang").value || "eng");
     fd.append("ocr_dpi", $("ocr_dpi").value || "300");
+    fd.append("ocr_psm", $("ocr_psm").value || "3");
 
     const btn = $("run");
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Running…';
@@ -254,6 +262,12 @@ function summarySentence(s) {
   return out;
 }
 
+function sourceBadge(source) {
+  if (source === "OCR") return '<span class="src src-ocr" title="Read from a scanned/image page by OCR">OCR</span>';
+  if (source === "text") return '<span class="src src-text" title="From the PDF\'s embedded text layer">Text layer</span>';
+  return '<span class="src src-none">-</span>';
+}
+
 function detailText(r) {
   const where = r.page == null ? "the PDF" : `page ${r.page}`;
   if (r.status === "EXACT") return `Found on ${where}.`;
@@ -288,7 +302,7 @@ function renderResults(data) {
         ? `<div class="banner" style="margin-top:1rem;"><b>Notes</b><ul>${data.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>`
         : ""}
       <details class="legend"><summary>How to read these results</summary>
-        <ul>${legend}<li class="muted">In the differences below, <del>red struck-through</del> text is in your spreadsheet but not the PDF; <ins>green</ins> text is in the PDF but not your spreadsheet.</li></ul>
+        <ul>${legend}<li><b>Matched via</b> — where the PDF text came from: ${sourceBadge("text")} (the PDF's real text) or ${sourceBadge("OCR")} (read from a scanned/image page).</li><li class="muted">In the differences below, <del>red struck-through</del> text is in your spreadsheet but not the PDF; <ins>green</ins> text is in the PDF but not your spreadsheet.</li></ul>
       </details>
       <div style="margin-top:1rem;">
         <a class="report" href="${esc(data.report_urls.html)}" target="_blank">Download printable report</a> &nbsp;
@@ -329,7 +343,7 @@ function renderTables() {
     if (!rows.length) return;
     container.appendChild(el("h3", {}, col.name));
     const table = el("table", { html:
-      "<thead><tr><th>Row</th><th>Value in your spreadsheet</th><th>Result</th><th>Details</th></tr></thead><tbody>" +
+      "<thead><tr><th>Row</th><th>Value in your spreadsheet</th><th>Result</th><th>Matched via</th><th>Details</th></tr></thead><tbody>" +
       rows.map((r) => {
         let details = esc(detailText(r));
         if (r.status === "FUZZY" && r.diff && r.diff.length) {
@@ -338,6 +352,7 @@ function renderTables() {
         const value = esc(r.expected) || '<span class="muted">(empty)</span>';
         return `<tr><td>${r.row}</td><td>${value}</td>` +
           `<td><span class="badge b-${r.status}">${HUMAN[r.status].icon} ${esc(HUMAN[r.status].label)}</span></td>` +
+          `<td>${sourceBadge(r.source)}</td>` +
           `<td>${details}</td></tr>`;
       }).join("") + "</tbody>" });
     container.appendChild(table);

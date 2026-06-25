@@ -41,6 +41,9 @@ class MatchResult:
     best_match: str | None = None # the closest snippet found in the PDF
     score: int = 0                # fuzzy score 0-100 (100 for EXACT)
     diff: list[DiffOp] = field(default_factory=list)
+    # How the matched page's text was obtained: "text" (embedded text layer), "OCR"
+    # (recovered from a scanned page), or None when there is no matched page (skipped).
+    source: str | None = None
 
 
 @dataclass
@@ -73,6 +76,7 @@ class RunConfig:
     ocr: bool = False                 # OCR no-text-layer pages as a fallback (deterministic Tesseract)
     ocr_dpi: int = 300                # render DPI for OCR (higher = slower, more accurate)
     ocr_lang: str = "eng"             # Tesseract language pack(s), e.g. "eng" or "eng+ara"
+    ocr_psm: int = 3                  # Tesseract page-segmentation mode (3 = automatic)
 
 
 @dataclass

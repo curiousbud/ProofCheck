@@ -155,3 +155,8 @@ IMPORT_EDGES: web/schemas.py -> (none)
 
 `HealthResponse` gained `auth_enabled` + `ocr_available`. New models: `Credentials`, `AuthUser` (auth) and `HistoryItem` (run_id, created_at, excel, pdf, summary, meta) + `HistoryList` (run history). These remain a pure serialization of internal state -- still the SWAP CONTRACT.
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+`MatchResultModel` gained `source` (`'text'` | `'OCR'` | null).
+

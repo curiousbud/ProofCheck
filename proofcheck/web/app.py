@@ -163,6 +163,7 @@ def _serialize(result: RunResult, run_id: str) -> dict:
                         best_match=r.best_match,
                         score=r.score,
                         diff=[(op, text) for op, text in r.diff],
+                        source=r.source,
                     )
                     for r in col.results
                 ],
@@ -277,6 +278,7 @@ async def check(
     ocr: str = Form("false"),  # noqa: A002 - shadows the ocr module locally; resolved below
     ocr_lang: str = Form("eng"),
     ocr_dpi: int = Form(300),
+    ocr_psm: int = Form(3),
     user: str = Depends(auth.current_user),
 ) -> JSONResponse:
     """Run a full check and return the documented JSON shape + report download URLs."""
@@ -306,6 +308,7 @@ async def check(
             ocr=_parse_bool(ocr),
             ocr_lang=ocr_lang or "eng",
             ocr_dpi=ocr_dpi,
+            ocr_psm=ocr_psm,
         )
         result = pipeline_run(config)
 

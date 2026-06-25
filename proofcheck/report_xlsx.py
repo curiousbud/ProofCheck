@@ -78,7 +78,7 @@ def build(result: RunResult) -> Workbook:
         # Sheet titles are capped at 31 chars and can't contain certain characters.
         title = col.name[:31] or "Column"
         ws = wb.create_sheet(title=title)
-        ws.append(["Row", "Value in your spreadsheet", "Result", "Details"])
+        ws.append(["Row", "Value in your spreadsheet", "Result", "Matched via", "Details"])
         for cell in ws[1]:
             cell.font = _HEADER
         for r in col.results:
@@ -86,13 +86,14 @@ def build(result: RunResult) -> Workbook:
                 r.row,
                 r.expected,
                 f"{humanize.icon(r.status)} {humanize.label(r.status)}",
+                humanize.source_label(r.source),
                 humanize.detail(r),
             ])
             row_idx = ws.max_row
             result_cell = ws.cell(row=row_idx, column=3)
             result_cell.fill = _FILLS[r.status]
             result_cell.font = _WHITE
-            ws.cell(row=row_idx, column=4).alignment = _WRAP
+            ws.cell(row=row_idx, column=5).alignment = _WRAP
         _autosize(ws)
 
     return wb

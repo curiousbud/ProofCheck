@@ -39,6 +39,9 @@ th { background: #f5f5f5; }
 .skipped { background: #9e9e9e; }
 .detail { color: #333; } .diffline { margin-top: .35rem; font-size: .88rem; }
 .diffline .lbl { color: #666; }
+.src { font-size: .78rem; font-weight: 600; padding: .1rem .45rem; border-radius: 4px; white-space: nowrap; }
+.src-ocr { background: #ede7f6; color: #5e35b1; } .src-text { background: #eef3f8; color: #37474f; }
+.src-none { color: #999; }
 del { background: #ffd7d5; text-decoration: line-through; } ins { background: #d7f5dd; text-decoration: none; }
 .muted { color: #777; }
 """
@@ -99,6 +102,11 @@ def render(result: RunResult) -> str:
         "spreadsheet but not the PDF, and <ins>green</ins> text is in the PDF but not your "
         "spreadsheet.</li>"
     )
+    parts.append(
+        "<li><b>Matched&nbsp;via</b> shows where the PDF text came from: "
+        "<span class='src src-text'>Text layer</span> (the PDF's real text) or "
+        "<span class='src src-ocr'>OCR</span> (read from a scanned/image page).</li>"
+    )
     parts.append("</ul></div>")
 
     if result.warnings:
@@ -109,17 +117,19 @@ def render(result: RunResult) -> str:
     for col in result.columns:
         parts.append(f"<h2>{e(col.name)}</h2>")
         parts.append("<table><thead><tr><th>Row</th><th>Value in your spreadsheet</th>"
-                     "<th>Result</th><th>Details</th></tr></thead><tbody>")
+                     "<th>Result</th><th>Matched&nbsp;via</th><th>Details</th></tr></thead><tbody>")
         for r in col.results:
             cls = _STATUS_CLASS[r.status]
             badge = f"<span class='badge {cls}'>{humanize.icon(r.status)} {e(humanize.label(r.status))}</span>"
+            src = humanize.source_label(r.source)
+            src_cell = f"<span class='src src-{'ocr' if r.source == 'OCR' else 'text' if r.source == 'text' else 'none'}'>{e(src)}</span>"
             detail = f"<span class='detail'>{e(humanize.detail(r))}</span>"
             if r.status is Status.FUZZY and r.diff:
                 detail += (f"<div class='diffline'><span class='lbl'>Difference:</span> "
                            f"{_diff_html(r.diff)}</div>")
             parts.append(
                 f"<tr><td>{r.row}</td><td>{e(r.expected) or '<span class=muted>(empty)</span>'}</td>"
-                f"<td>{badge}</td><td>{detail}</td></tr>"
+                f"<td>{badge}</td><td>{src_cell}</td><td>{detail}</td></tr>"
             )
         parts.append("</tbody></table>")
 

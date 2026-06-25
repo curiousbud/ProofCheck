@@ -84,3 +84,8 @@ The single public workhorse. It guards on `available()`, computes the render sca
 - **Never partially mutates on failure:** callers (`pdf._apply_ocr`) treat any `OcrError` as "leave the page in `empty_pages`", so a failed OCR never produces nondeterministic partial output.
 - **1-based page numbers** match `pdf.PdfText.empty_pages` and what users see in a viewer.
 - **Install:** `pip install 'proofcheck[ocr]'` for the libs; the engine binary is separate (e.g. `apt install tesseract-ocr`, `choco install tesseract`).
+
+## v0.2 changes (OCR diagnostics + source column)
+
+Engine improvements: pages are now rendered then preprocessed deterministically by `_render_page` (flatten transparency onto white, convert to grayscale, autocontrast) before Tesseract, recognized with LSTM (`--oem 3`) and a configurable page-segmentation mode (`psm`, default 3). New `diagnose(path, pages, ..., save_dir=None)` returns `PageDiagnostic` (text, mean_confidence, word_count, image_path) for verifying OCR quality; `version()` reports the engine version. `ocr_pages` gained `psm`/`oem` params.
+

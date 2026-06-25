@@ -48,19 +48,19 @@ def file_sha256(path: str, *, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def _entry_path(directory: Path, digest: str, dpi: int, lang: str) -> Path:
-    # DPI and language change OCR output, so they are part of the key.
+def _entry_path(directory: Path, digest: str, dpi: int, lang: str, psm: int) -> Path:
+    # DPI, language, and page-segmentation mode all change OCR output, so all are in the key.
     safe_lang = "".join(c for c in lang if c.isalnum() or c in "+-_") or "eng"
-    return directory / f"{digest}.{dpi}.{safe_lang}.json"
+    return directory / f"{digest}.{dpi}.{safe_lang}.psm{int(psm)}.json"
 
 
-def load(digest: str, *, dpi: int, lang: str) -> dict[int, str] | None:
-    """Return cached ``{page: text}`` for this content+dpi+lang, or ``None`` on miss."""
+def load(digest: str, *, dpi: int, lang: str, psm: int = 3) -> dict[int, str] | None:
+    """Return cached ``{page: text}`` for this content+dpi+lang+psm, or ``None`` on miss."""
     directory = cache_dir()
     if directory is None:
         return None
     try:
-        with open(_entry_path(directory, digest, dpi, lang), encoding="utf-8") as fh:
+        with open(_entry_path(directory, digest, dpi, lang, psm), encoding="utf-8") as fh:
             raw = json.load(fh)
     except (OSError, ValueError):
         return None
@@ -68,14 +68,14 @@ def load(digest: str, *, dpi: int, lang: str) -> dict[int, str] | None:
     return {int(k): v for k, v in raw.items()}
 
 
-def store(digest: str, *, dpi: int, lang: str, pages: dict[int, str]) -> None:
-    """Persist ``{page: text}`` for this content+dpi+lang. Best-effort (never raises)."""
+def store(digest: str, *, dpi: int, lang: str, pages: dict[int, str], psm: int = 3) -> None:
+    """Persist ``{page: text}`` for this content+dpi+lang+psm. Best-effort (never raises)."""
     directory = cache_dir()
     if directory is None:
         return
     try:
         directory.mkdir(parents=True, exist_ok=True)
-        path = _entry_path(directory, digest, dpi, lang)
+        path = _entry_path(directory, digest, dpi, lang, psm)
         tmp = path.with_suffix(path.suffix + ".tmp")
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump({str(k): v for k, v in pages.items()}, fh)

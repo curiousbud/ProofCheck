@@ -187,3 +187,8 @@ Thin wrapper that renders the document and writes it to `path` as UTF-8 (matchin
 
 Rewritten for non-technical readers. Now opens with a one-sentence overview (`humanize.summary_sentence`) and a 'how to read this' legend; each row is explained in plain English (`humanize.detail`) with Found / Found-with-differences / Not-found / Blank badges instead of EXACT/FUZZY/etc. Table columns: Row | Value in your spreadsheet | Result | Details, with red=removed / green=added diff highlighting under fuzzy rows. Document title is now 'ProofCheck results'. Depends on humanize.py (see humanize_EXPLAINED.md).
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+Added a 'Matched via' column (`humanize.source_label`) showing Text layer vs OCR per row, with a legend entry; styled via new `.src` classes.
+

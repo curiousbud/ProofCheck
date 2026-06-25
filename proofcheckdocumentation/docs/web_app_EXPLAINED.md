@@ -332,3 +332,8 @@ IMPORT_EDGES: web/app.py -> __init__.py (proofcheck package, __version__), repor
 
 v0.2: mounts `/static` (StaticFiles) for the SPA assets; `/` still serves index.html. `/api/health` now reports `auth_enabled` + `ocr_available`. `/api/inspect` and `/api/check` depend on `auth.current_user` (anonymous when auth off, 401 when on). `/api/check` accepts `fold_diacritics`/`ocr`/`ocr_lang`/`ocr_dpi` form fields and records non-PII history via `store.add_run`. New routes: `/api/auth/{login,logout,me,register}` and `/api/history` (+ `/{run_id}` GET/DELETE). `store.init_db()` + `auth.bootstrap_admin()` run at import. See web_auth_EXPLAINED.md / web_store_EXPLAINED.md.
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+`/api/check` accepts an `ocr_psm` form field; the serialized match results now include `source` (text/OCR).
+

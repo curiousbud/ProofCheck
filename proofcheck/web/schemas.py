@@ -49,6 +49,8 @@ class MatchResultModel(BaseModel):
     score: int = 0
     # Serialized as a list of [op, text] pairs (see module docstring / addendum spec).
     diff: list[tuple[str, str]] = Field(default_factory=list)
+    # How the matched page's text was obtained: "text" | "OCR" | null (no matched page).
+    source: str | None = None
 
 
 class ColumnResultModel(BaseModel):

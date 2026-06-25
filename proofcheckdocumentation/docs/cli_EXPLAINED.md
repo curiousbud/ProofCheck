@@ -254,3 +254,8 @@ IMPORT_EDGES: proofcheck.cli -> proofcheck (__version__); proofcheck.cli -> proo
 
 `check` gained `--fold-diacritics`, `--ocr`, `--ocr-dpi` (IntRange 72-1200), and `--ocr-lang` options, wired straight into `RunConfig`. No change to `inspect`/`serve`.
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+New `proofcheck ocr PDF` diagnostics command: prints recovered text + mean confidence per page (flags low-confidence), with `--pages`/`--all-pages`, `--ocr-lang/--ocr-dpi/--ocr-psm`, `--save-images DIR` (dump the images fed to Tesseract), and `--full-text`. `check` also gained `--ocr-psm` (page-segmentation mode).
+

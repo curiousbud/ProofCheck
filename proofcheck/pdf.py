@@ -70,6 +70,7 @@ def extract(
     ocr: bool = False,
     ocr_dpi: int = 300,
     ocr_lang: str = "eng",
+    ocr_psm: int = 3,
 ) -> PdfText:
     """Extract text from every page of the PDF at ``path``.
 
@@ -90,12 +91,12 @@ def extract(
         raise PdfError(f"Could not read PDF file: {exc}") from exc
 
     if ocr and result.empty_pages:
-        _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang)
+        _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm)
 
     return result
 
 
-def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str) -> None:
+def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 3) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
 
     Uses the content-addressed OCR cache first: an identical file (same bytes, dpi, lang)
@@ -109,7 +110,7 @@ def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str) -> None:
 
     use_cache = ocr_cache.enabled()
     digest = ocr_cache.file_sha256(path) if use_cache else None
-    recovered = ocr_cache.load(digest, dpi=dpi, lang=lang) if use_cache else None
+    recovered = ocr_cache.load(digest, dpi=dpi, lang=lang, psm=psm) if use_cache else None
 
     if recovered is not None:
         result.ocr_from_cache = True  # cache hit: unchanged file, skip OCR entirely
@@ -118,12 +119,12 @@ def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str) -> None:
             result.ocr_unavailable_reason = ocr_mod.unavailable_reason()
             return
         try:
-            recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang)
+            recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang, psm=psm)
         except ocr_mod.OcrError as exc:
             result.ocr_error = str(exc)
             return
         if use_cache and digest is not None:
-            ocr_cache.store(digest, dpi=dpi, lang=lang, pages=recovered)
+            ocr_cache.store(digest, dpi=dpi, lang=lang, pages=recovered, psm=psm)
 
     still_empty: list[int] = []
     for p in result.empty_pages:

@@ -7,6 +7,8 @@ monkeypatched success path that exercises the wiring without needing the engine.
 
 from __future__ import annotations
 
+import pytest
+
 from proofcheck import ocr, ocr_cache, pdf
 from proofcheck.models import RunConfig, Status
 from proofcheck.pipeline import run
@@ -134,6 +136,41 @@ def test_pipeline_ocr_flag_recorded_in_meta(excel_path, pdf_path):
                        sheet="Delegates", ocr=True)
     result = run(config)
     assert result.meta.flags["ocr"] is True
+
+
+def test_result_source_marks_text_vs_ocr(excel_path, pdf_path, monkeypatch):
+    # Inject an OCR-recovered page 2 so a normally-MISSING value matches there.
+    real_extract = pdf.extract
+
+    def patched(path, **kw):
+        t = real_extract(path)  # text layer only
+        t.pages[2] = "Zzxqq Nobody CC-999 Atlantis"
+        t.ocr_pages = [2]
+        if 2 in t.empty_pages:
+            t.empty_pages.remove(2)
+        return t
+
+    monkeypatch.setattr("proofcheck.pipeline.pdf.extract", patched)
+    result = run(RunConfig(excel_path=excel_path, pdf_path=pdf_path,
+                           columns=["Name"], sheet="Delegates"))
+    by_expected = {r.expected: r for r in result.columns[0].results}
+    # Priya Nair is on page 1 (real text layer); Zzxqq Nobody now matches the OCR'd page 2.
+    assert by_expected["Priya Nair"].source == "text"
+    assert by_expected["Zzxqq Nobody"].source == "OCR"
+    assert by_expected["Zzxqq Nobody"].status is Status.EXACT
+    # A skipped (blank) row has no matched page, so no source.
+    assert by_expected[""].source is None
+
+
+def test_diagnose_reports_text_and_confidence(pdf_path, tmp_path):
+    if not ocr.available():
+        pytest.skip("OCR engine not installed")
+    diags = ocr.diagnose(pdf_path, [1, 2], save_dir=str(tmp_path / "imgs"))
+    assert {d.page for d in diags} == {1, 2}
+    for d in diags:
+        assert isinstance(d.mean_confidence, float)
+        assert d.word_count >= 0
+        assert d.image_path and __import__("os").path.isfile(d.image_path)  # rendered image saved
 
 
 def test_pipeline_diacritics_match(excel_path, pdf_path, monkeypatch):

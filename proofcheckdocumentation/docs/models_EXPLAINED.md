@@ -188,3 +188,8 @@ The top-level, self-describing output of a run. Requires a `Meta` and a `Summary
 
 `RunConfig` gained `fold_diacritics: bool`, `ocr: bool`, `ocr_dpi: int = 300`, and `ocr_lang: str = 'eng'`. `Meta.flags` now also echoes `fold_diacritics` and `ocr` (still a `dict[str, bool]`; dpi/lang are config, not flags).
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+`MatchResult` gained `source` (`'text'` | `'OCR'` | None) — whether the matched page's text came from the embedded text layer or from OCR; set by `pipeline.run` from `pdf_text.ocr_pages` and shown as the reports' 'Matched via' column. `RunConfig` gained `ocr_psm` (Tesseract page-segmentation mode, default 3).
+

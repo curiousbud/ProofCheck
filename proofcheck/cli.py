@@ -62,6 +62,8 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
 @click.option("--ocr-dpi", default=300, show_default=True, type=click.IntRange(72, 1200),
               help="Render DPI used for OCR.")
 @click.option("--ocr-lang", default="eng", show_default=True, help="Tesseract language(s), e.g. 'eng+ara'.")
+@click.option("--ocr-psm", default=3, show_default=True, type=click.IntRange(0, 13),
+              help="Tesseract page-segmentation mode (3=auto, 6=block, 4=columns, 11=sparse).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
 @click.option("--xlsx", "xlsx_out", type=click.Path(dir_okay=False), help="Write an xlsx report here.")
 def check(
@@ -79,6 +81,7 @@ def check(
     ocr: bool,
     ocr_dpi: int,
     ocr_lang: str,
+    ocr_psm: int,
     html_out: str | None,
     xlsx_out: str | None,
 ) -> None:
@@ -98,6 +101,7 @@ def check(
         ocr=ocr,
         ocr_dpi=ocr_dpi,
         ocr_lang=ocr_lang,
+        ocr_psm=ocr_psm,
     )
     try:
         result = pipeline_run(config)
@@ -123,6 +127,105 @@ def check(
     # Non-zero exit when anything is missing, so CI/scripts can gate on it.
     if s.missing:
         sys.exit(1)
+
+
+def _parse_pages(spec: str, page_count: int) -> list[int]:
+    """Parse a page spec like '1,3,5-7' into a sorted list of valid 1-based page numbers."""
+    pages: set[int] = set()
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            lo, _, hi = part.partition("-")
+            try:
+                for p in range(int(lo), int(hi) + 1):
+                    pages.add(p)
+            except ValueError:
+                continue
+        elif part.isdigit():
+            pages.add(int(part))
+    return sorted(p for p in pages if 1 <= p <= page_count)
+
+
+@cli.command()
+@click.argument("pdf_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--pages", default=None,
+              help="Pages to OCR, e.g. '1,3,5-7'. Default: only pages with no text layer.")
+@click.option("--all-pages", is_flag=True, help="OCR every page, even those with a text layer.")
+@click.option("--ocr-lang", default="eng", show_default=True, help="Tesseract language(s), e.g. 'eng+ara'.")
+@click.option("--ocr-dpi", default=300, show_default=True, type=click.IntRange(72, 1200))
+@click.option("--ocr-psm", default=3, show_default=True, type=click.IntRange(0, 13),
+              help="Page-segmentation mode (3=auto, 6=block, 4=columns, 11=sparse).")
+@click.option("--save-images", type=click.Path(file_okay=False),
+              help="Directory to save the rendered page images fed to OCR (to see what Tesseract saw).")
+@click.option("--full-text", is_flag=True, help="Print the full OCR text for every page.")
+def ocr(
+    pdf_path: str,
+    pages: str | None,
+    all_pages: bool,
+    ocr_lang: str,
+    ocr_dpi: int,
+    ocr_psm: int,
+    save_images: str | None,
+    full_text: bool,
+) -> None:
+    """Diagnose OCR on a PDF: show the recovered text and confidence per page.
+
+    Use this to verify OCR quality. By default it OCRs only the pages that have no text
+    layer (the ones a real run would OCR); pass --pages or --all-pages to inspect others.
+    """
+    from . import ocr as ocr_mod, pdf as pdf_mod
+
+    if not ocr_mod.available():
+        _fail(ocr_mod.unavailable_reason() or "OCR is unavailable.")
+
+    try:
+        layer = pdf_mod.extract(pdf_path)  # text-layer pass: which pages need OCR
+    except pdf_mod.PdfError as exc:
+        _fail(str(exc))
+    page_count = len(layer.pages)
+    empty = set(layer.empty_pages)
+
+    if pages:
+        targets = _parse_pages(pages, page_count)
+    elif all_pages:
+        targets = list(range(1, page_count + 1))
+    else:
+        targets = sorted(empty)
+
+    click.echo(f"PDF: {pdf_path}  ({page_count} page(s); Tesseract {ocr_mod.version()})")
+    if not targets:
+        click.echo("No pages to OCR — every page already has an embedded text layer. "
+                   "Use --all-pages to OCR them anyway.")
+        return
+
+    try:
+        diags = ocr_mod.diagnose(pdf_path, targets, dpi=ocr_dpi, lang=ocr_lang,
+                                 psm=ocr_psm, save_dir=save_images)
+    except ocr_mod.OcrError as exc:
+        _fail(str(exc))
+
+    for d in diags:
+        layer_note = " (already has a text layer)" if d.page not in empty else ""
+        flag = "  [!] low confidence" if d.word_count and d.mean_confidence < 60 else ""
+        click.echo("")
+        click.echo(f"-- Page {d.page}{layer_note} -- confidence {d.mean_confidence:.1f}%, "
+                   f"{d.word_count} word(s){flag}")
+        if d.image_path:
+            click.echo(f"   image: {d.image_path}")
+        snippet = d.text.strip()
+        if not snippet:
+            click.echo("   (no text recognised)")
+        elif full_text:
+            click.echo(snippet)
+        else:
+            preview = " ".join(snippet.split())
+            click.echo("   " + (preview[:300] + (" ..." if len(preview) > 300 else "")))
+
+    if not full_text:
+        click.echo("\nTip: add --full-text to print complete page text, or --save-images DIR "
+                   "to inspect what OCR saw.")
 
 
 @cli.command()

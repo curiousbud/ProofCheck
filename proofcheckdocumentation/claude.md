@@ -73,7 +73,7 @@ Proof-Reader/
 │   ├── humanize.py               · plain-language labels/sentences for the reports (presentation only)
 │   ├── report_html.py            · standalone, human-readable HTML report from RunResult
 │   ├── report_xlsx.py            · human-readable xlsx report from RunResult
-│   ├── cli.py                    · thin click CLI: check / inspect / serve
+│   ├── cli.py                    · thin click CLI: check / inspect / ocr (diagnostics) / serve
 │   └── web/                      ← disposable web layer (zero business logic)
 │       ├── __init__.py
 │       ├── app.py                · FastAPI routes + RunResult->JSON serialization
@@ -163,7 +163,7 @@ Each link is a line-by-line explainer (logic, functions, key variables, dependen
 | `proofcheck/humanize.py` | [humanize_EXPLAINED.md](docs/humanize_EXPLAINED.md) | Plain-language report wording |
 | `proofcheck/report_html.py` | [report_html_EXPLAINED.md](docs/report_html_EXPLAINED.md) | Human-readable HTML report writer |
 | `proofcheck/report_xlsx.py` | [report_xlsx_EXPLAINED.md](docs/report_xlsx_EXPLAINED.md) | Human-readable xlsx report writer |
-| `proofcheck/cli.py` | [cli_EXPLAINED.md](docs/cli_EXPLAINED.md) | CLI (check/inspect/serve) |
+| `proofcheck/cli.py` | [cli_EXPLAINED.md](docs/cli_EXPLAINED.md) | CLI (check/inspect/ocr/serve) |
 
 ### Web layer
 | File | Deep-dive | Role |
@@ -201,7 +201,7 @@ the project's core contract.
 
 ### Current state (as of this guide)
 - Full core engine, CLI, web API + SPA, reports, and tests are implemented (v0.2.0).
-- **52 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
+- **54 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
 - v0.2 added: **optional deterministic OCR** fallback (`ocr.py`) with a **content-addressed
   cache** (`ocr_cache.py`, never OCR an unchanged file twice), **diacritic folding**
   (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), **opt-in auth +
@@ -253,9 +253,17 @@ PROOFCHECK_AUTH=on PROOFCHECK_ADMIN_USER=admin PROOFCHECK_ADMIN_PASSWORD=secret1
   `--ocr` (or the web checkbox) they are recovered via Tesseract — a fixed, offline glyph
   recogniser, NOT a learned/generative model — so same image + DPI → same text. If the OCR
   libs/binary are missing, it degrades to the old warn-and-skip behavior and never raises.
-- **OCR is cached by content** (`ocr_cache.py`): keyed by `sha256(file)+dpi+lang`, so an
+- **OCR is cached by content** (`ocr_cache.py`): keyed by `sha256(file)+dpi+lang+psm`, so an
   unchanged file is never OCR'd twice and a changed file (different hash) is OCR'd fresh.
   The cache is an optimization only — it returns exactly what OCR would have produced.
+- **OCR engine tuning** lives in `ocr.py`: pages are rendered then preprocessed
+  deterministically (flatten→grayscale→autocontrast) and recognized with LSTM (`--oem 3`) and
+  a configurable page-segmentation mode (`--ocr-psm`, default 3). `ocr.diagnose()` (and the
+  `proofcheck ocr` CLI command) report per-page text + mean confidence and can dump the
+  rendered images — the way to verify OCR quality. Keep all of this deterministic.
+- **Each `MatchResult` carries `source`** (`"text"` | `"OCR"` | None): whether the matched
+  page's text came from the embedded text layer or from OCR. `pipeline.run` sets it from
+  `pdf_text.ocr_pages`; the reports/SPA show it as a **"Matched via"** column.
 - **Reports are human-readable** (`humanize.py` is the single source of truth). The data
   contract keeps `EXACT/FUZZY/MISSING/SKIPPED`; the HTML/xlsx writers and the SPA map those
   to Found / Found-with-differences / Not-found / Blank. If you add a status or change

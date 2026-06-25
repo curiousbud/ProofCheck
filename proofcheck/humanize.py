@@ -58,6 +58,15 @@ def summary_sentence(result: RunResult) -> str:
     return sentence
 
 
+def source_label(source: str | None) -> str:
+    """Where the matched page's text came from: 'OCR', 'Text layer', or '-' (none)."""
+    if source == "OCR":
+        return "OCR"
+    if source == "text":
+        return "Text layer"
+    return "-"
+
+
 def detail(r: MatchResult) -> str:
     """A plain-English explanation of one result (no markup)."""
     where = f"page {r.page}" if r.page else "the PDF"

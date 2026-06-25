@@ -44,7 +44,13 @@ All normalization is deterministic and applied to both sides before comparison:
   (`pypdfium2`) and read with the offline **Tesseract** engine — a fixed glyph recognizer,
   so the same image at the same DPI always yields the same text. It recovers real glyphs;
   it never *guesses*.
-- Tunable: **`--ocr-lang`** (e.g. `eng+ara`) and **`--ocr-dpi`** (default 300).
+- **Tuned for accuracy.** Pages are preprocessed deterministically before OCR — flattened
+  onto white, converted to grayscale, and auto-contrasted (the clean input Tesseract reads
+  best) — and recognized with the LSTM engine.
+- Tunable: **`--ocr-lang`** (e.g. `eng+ara`), **`--ocr-dpi`** (default 300; raise for small
+  text), and **`--ocr-psm`** (page layout: auto / single block / columns / sparse).
+- **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text + confidence per page;
+  `--save-images` dumps what Tesseract saw.
 - **Cached by content — never OCR the same file twice.** OCR text is cached keyed by a
   SHA-256 of the file's bytes. Re-uploading the **same** PDF is a cache hit (no OCR, no
   engine needed); a file whose data **changed** gets a different hash and is OCR'd fresh.
@@ -61,6 +67,9 @@ All normalization is deterministic and applied to both sides before comparison:
   small differences, 1 not found") and a short "how to read this" legend.
 - Every row explains itself in English — where the value was found, the exact text in the
   PDF, and a highlighted difference (red = removed, green = added) when it isn't an exact match.
+- A **"Matched via"** column shows whether each value was matched against the PDF's real
+  **Text layer** or text recovered by **OCR** — so you can tell at a glance which results
+  relied on OCR.
 - **Standalone HTML report** — self-contained, printable, color-coded.
 - **Excel (.xlsx) report** — a Summary sheet plus one friendly sheet per checked column.
 - All three views are generated from the same result, so they always agree.
@@ -106,7 +115,7 @@ All normalization is deterministic and applied to both sides before comparison:
   JSON contract (`web/schemas.py`).
 - **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
   create a virtualenv, install the package, and run the tests in one command.
-- **Deterministic test suite** (52 tests) with fixtures generated on the fly — no committed
+- **Deterministic test suite** (54 tests) with fixtures generated on the fly — no committed
   binaries. OCR tests pass with or without the engine installed.
 
 ---
@@ -171,11 +180,20 @@ proofcheck check delegates.xlsx program.pdf \
     --html report.html --xlsx report.xlsx
 
 # OCR scanned / image-only pages before matching (needs the Tesseract engine)
-proofcheck check scan.xlsx scan.pdf --column "Name" --ocr --ocr-lang eng --ocr-dpi 300
+proofcheck check scan.xlsx scan.pdf --column "Name" --ocr --ocr-lang eng --ocr-dpi 300 --ocr-psm 3
+
+# Diagnose OCR: see the recovered text + confidence per page (and save the images OCR saw)
+proofcheck ocr scan.pdf --full-text --save-images ./ocr-debug
 
 # Check every column
 proofcheck check delegates.xlsx program.pdf --all-columns
 ```
+
+The **`proofcheck ocr`** command is the quickest way to verify OCR quality: it prints each
+page's recovered text and a **mean confidence** (flagging low-confidence pages), and with
+`--save-images DIR` it writes the exact images fed to Tesseract so you can see what it saw.
+Tune accuracy with `--ocr-dpi` (raise for small text) and `--ocr-psm` (page layout:
+`3`=auto, `6`=single block, `4`=columns, `11`=sparse).
 
 `check` exits non-zero when anything is `MISSING`, so it can gate CI / scripts.
 
@@ -246,7 +264,9 @@ build's `dist/`, point it at the same `/api/*` endpoints. Backend untouched.
 
 `POST /api/check` form fields: `columns` (comma-separated), `all_columns`, `sheet`,
 `header_row`, `fuzzy_threshold`, `normalize_digits`, `strip_punctuation`,
-`fold_diacritics`, `reverse`, `ocr`, `ocr_lang`, `ocr_dpi`.
+`fold_diacritics`, `reverse`, `ocr`, `ocr_lang`, `ocr_dpi`, `ocr_psm`. Each match result
+also carries a `source` field (`"text"` | `"OCR"` | `null`) — how the matched page's text
+was obtained.
 
 Response shape:
 
@@ -363,7 +383,7 @@ Full per-file deep-dives live in [`proofcheckdocumentation/`](proofcheckdocument
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 52 tests
+pytest          # 54 tests
 ```
 
 OCR tests cover both the real graceful-degradation path and a monkeypatched recovery path,

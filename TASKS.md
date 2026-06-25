@@ -11,6 +11,9 @@ HTML / xlsx reports plus a swappable web UI.
 - [x] `excel.py` — load workbook, inspect sheets/headers, read column values per row
 - [x] `pdf.py` — per-page text extraction, detect pages with no text layer (warnings), **optional OCR fallback**
 - [x] `ocr.py` — **optional, deterministic Tesseract OCR** for no-text-layer (scanned) pages; graceful no-op when absent
+- [x] `ocr.py` — **tuned engine** (flatten→grayscale→autocontrast preprocessing, LSTM `--oem 3`, configurable `--ocr-psm`) + **`diagnose()`** (per-page text + confidence + saved images)
+- [x] CLI **`proofcheck ocr`** — diagnostics command to verify OCR output/confidence per page
+- [x] `MatchResult.source` (`text`/`OCR`) — surfaced as a **"Matched via"** column in the web UI + HTML + xlsx reports
 - [x] `ocr_cache.py` — **content-addressed OCR cache** (sha256 of file + dpi + lang); unchanged file = cache hit (no re-OCR), changed file = fresh OCR
 - [x] `humanize.py` — **plain-language wording** for reports (Found / Found-with-differences / Not-found / Blank); presentation only
 - [x] `matcher.py` — exact / fuzzy / missing / skipped matching + `[op,text]` diff (difflib)

@@ -188,3 +188,8 @@ Builds the workbook and saves it to `path` via openpyxl's `Workbook.save`. This 
 
 Rewritten for readability. The Summary sheet leads with `humanize.summary_sentence` and friendly counts (Found / Found with differences / Not found / Blank / Match rate); each per-column sheet is Row | Value in your spreadsheet | Result | Details, with the Result cell color-coded and the Details cell wrapped. The raw Diff/Score columns are gone (the % similar is folded into the plain-English Details). Depends on humanize.py.
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+Per-column sheets gained a 'Matched via' column (Text layer / OCR) between Result and Details.
+

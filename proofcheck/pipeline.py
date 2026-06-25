@@ -71,27 +71,32 @@ def run(config: RunConfig) -> RunResult:
             ocr=config.ocr,
             ocr_dpi=config.ocr_dpi,
             ocr_lang=config.ocr_lang,
+            ocr_psm=config.ocr_psm,
         )
     except pdf.PdfError as exc:
         raise PipelineError(str(exc)) from exc
 
     # 3. Match every value in every selected column.
+    # Pages recovered via OCR, so each match can report whether it came from the embedded
+    # text layer or from OCR.
+    ocr_page_set = set(pdf_text.ocr_pages)
     columns: list[ColumnResult] = []
     for cd in column_data:
         col_result = ColumnResult(name=cd.name)
         for row_num, value in cd.cells:
-            col_result.results.append(
-                match_value(
-                    value,
-                    pdf_text.pages,
-                    fuzzy_threshold=config.fuzzy_threshold,
-                    normalize_digits=config.normalize_digits,
-                    strip_punctuation=config.strip_punctuation,
-                    fold_diacritics=config.fold_diacritics,
-                    reverse=config.reverse,
-                    row=row_num,
-                )
+            mr = match_value(
+                value,
+                pdf_text.pages,
+                fuzzy_threshold=config.fuzzy_threshold,
+                normalize_digits=config.normalize_digits,
+                strip_punctuation=config.strip_punctuation,
+                fold_diacritics=config.fold_diacritics,
+                reverse=config.reverse,
+                row=row_num,
             )
+            if mr.page is not None:
+                mr.source = "OCR" if mr.page in ocr_page_set else "text"
+            col_result.results.append(mr)
         columns.append(col_result)
 
     # 4. Assemble the result.

@@ -184,3 +184,8 @@ For each loaded column, a `ColumnResult` is created and each `(row_num, value)` 
 
 `run()` now passes `ocr`/`ocr_dpi`/`ocr_lang` to `pdf.extract` and `fold_diacritics` to `match_value`, and echoes `fold_diacritics` + `ocr` in `Meta.flags`. OCR warnings flow through `pdf_text.warnings()` into `RunResult.warnings` unchanged.
 
+
+## v0.2 changes (OCR diagnostics + source column)
+
+`run` now passes `ocr_psm` to `pdf.extract` and, after matching, sets each `MatchResult.source` to 'OCR' or 'text' based on whether its matched page is in `pdf_text.ocr_pages`.
+
