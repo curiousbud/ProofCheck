@@ -264,3 +264,8 @@ New `proofcheck ocr PDF` diagnostics command: prints recovered text + mean confi
 
 `check` and `ocr` now accept a PDF, a single image, OR a directory of images (PDF_PATH arg is `dir_okay=True`). The `ocr` command branches on `images.is_image_input`: for images it lists files, labels each page with its filename, and uses `ocr.diagnose_image_file`; it prints a per-run low-confidence count. (`import os` added.)
 
+
+## v0.2 changes (theme + OCR-cache toggle)
+
+`check` gained `--no-ocr-cache` (force fresh OCR -> `RunConfig.ocr_cache=False`).
+

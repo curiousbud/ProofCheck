@@ -48,8 +48,12 @@ def list_images(path: str) -> list[str]:
     return [path] if is_image_file(path) else []
 
 
-def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 3) -> PdfText:
-    """Build a :class:`PdfText` by OCR'ing the image(s) at ``path`` (file or directory)."""
+def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 3,
+            use_cache: bool = True) -> PdfText:
+    """Build a :class:`PdfText` by OCR'ing the image(s) at ``path`` (file or directory).
+
+    ``use_cache=False`` forces a fresh OCR of every image even if cached.
+    """
     from . import ocr as ocr_mod, ocr_cache
 
     result = PdfText()
@@ -65,7 +69,7 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 3) -> PdfText:
         result.ocr_unavailable_reason = ocr_mod.unavailable_reason()
         return result
 
-    use_cache = ocr_cache.enabled()
+    use_cache = use_cache and ocr_cache.enabled()
     all_cached = True
     for i, image_path in enumerate(files, start=1):
         digest = ocr_cache.file_sha256(image_path) if use_cache else None

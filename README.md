@@ -99,6 +99,8 @@ All normalization is deterministic and applied to both sides before comparison:
   inline diff highlighting and one-click report downloads.
 - Re-uploading an **edited file** re-reads it automatically (no page refresh needed), and your
   column selection is preserved across re-inspects.
+- **Dark / light mode** toggle in the header (remembers your choice; follows the OS preference
+  by default), and a **"Use OCR cache"** checkbox to force a fresh OCR for a run.
 - It only speaks the documented `/api/*` JSON contract, so the whole frontend is replaceable
   wholesale (e.g. with a bundled React/Vue build) without touching the backend.
 
@@ -126,7 +128,7 @@ All normalization is deterministic and applied to both sides before comparison:
   JSON contract (`web/schemas.py`).
 - **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
   create a virtualenv, install the package, and run the tests in one command.
-- **Deterministic test suite** (57 tests) with fixtures generated on the fly — no committed
+- **Deterministic test suite** (58 tests) with fixtures generated on the fly — no committed
   binaries. OCR tests pass with or without the engine installed.
 
 ---
@@ -224,7 +226,8 @@ Tune accuracy with `--ocr-dpi` (raise for small text) and `--ocr-psm` (page layo
 `--reverse` (also try reversed word order, e.g. "Last First").
 
 **OCR flags:** `--ocr` (OCR pages with no text layer), `--ocr-lang` (Tesseract language(s),
-e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300).
+e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300), `--ocr-psm` (page layout),
+`--no-ocr-cache` (force fresh OCR, ignore the cache for this run).
 
 ### Status meanings & colors
 
@@ -285,7 +288,7 @@ build's `dist/`, point it at the same `/api/*` endpoints. Backend untouched.
 
 `POST /api/check` form fields: `columns` (comma-separated), `all_columns`, `sheet`,
 `header_row`, `fuzzy_threshold`, `normalize_digits`, `strip_punctuation`,
-`fold_diacritics`, `reverse`, `ocr`, `ocr_lang`, `ocr_dpi`, `ocr_psm`. Each match result
+`fold_diacritics`, `reverse`, `ocr`, `ocr_lang`, `ocr_dpi`, `ocr_psm`, `ocr_cache`. Each match result
 also carries a `source` field (`"text"` | `"OCR"` | `null`) — how the matched page's text
 was obtained.
 
@@ -406,7 +409,7 @@ Full per-file deep-dives live in [`proofcheckdocumentation/`](proofcheckdocument
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 57 tests
+pytest          # 58 tests
 ```
 
 OCR tests cover both the real graceful-degradation path and a monkeypatched recovery path,

@@ -72,6 +72,7 @@ def run(config: RunConfig) -> RunResult:
             ocr_dpi=config.ocr_dpi,
             ocr_lang=config.ocr_lang,
             ocr_psm=config.ocr_psm,
+            use_cache=config.ocr_cache,
         )
     except pdf.PdfError as exc:
         raise PipelineError(str(exc)) from exc
@@ -113,6 +114,7 @@ def run(config: RunConfig) -> RunResult:
             "reverse": config.reverse,
             "all_columns": config.all_columns,
             "ocr": config.ocr,
+            "ocr_cache": config.ocr_cache,
         },
     )
     return RunResult(

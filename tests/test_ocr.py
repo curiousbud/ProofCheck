@@ -120,6 +120,18 @@ def test_ocr_cache_misses_when_content_changes(pdf_path, tmp_path, monkeypatch):
     assert calls["n"] == 2
 
 
+def test_ocr_cache_per_run_flag_forces_fresh(pdf_path, monkeypatch):
+    # Cache is enabled (conftest sets a tmp dir), but use_cache=False must re-OCR each time.
+    calls = {"n": 0}
+    monkeypatch.setattr(ocr, "available", lambda: True)
+    monkeypatch.setattr(ocr, "ocr_pages",
+                        lambda path, pages, **kw: (calls.__setitem__("n", calls["n"] + 1)
+                                                   or {p: "text" for p in pages}))
+    pdf.extract(pdf_path, ocr=True, use_cache=False)
+    pdf.extract(pdf_path, ocr=True, use_cache=False)
+    assert calls["n"] == 2  # the per-run flag bypassed the cache both times
+
+
 def test_ocr_cache_can_be_disabled(pdf_path, monkeypatch):
     monkeypatch.setenv("PROOFCHECK_OCR_CACHE", "off")
     assert ocr_cache.enabled() is False

@@ -205,7 +205,7 @@ the project's core contract.
 
 ### Current state (as of this guide)
 - Full core engine, CLI, web API + SPA, reports, and tests are implemented (v0.2.0).
-- **57 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
+- **58 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
 - v0.2 added: **optional deterministic OCR** fallback (`ocr.py`) with a **content-addressed
   cache** (`ocr_cache.py`, never OCR an unchanged file twice), **diacritic folding**
   (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), **opt-in auth +

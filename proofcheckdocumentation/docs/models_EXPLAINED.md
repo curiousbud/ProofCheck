@@ -193,3 +193,8 @@ The top-level, self-describing output of a run. Requires a `Meta` and a `Summary
 
 `MatchResult` gained `source` (`'text'` | `'OCR'` | None) — whether the matched page's text came from the embedded text layer or from OCR; set by `pipeline.run` from `pdf_text.ocr_pages` and shown as the reports' 'Matched via' column. `RunConfig` gained `ocr_psm` (Tesseract page-segmentation mode, default 3).
 
+
+## v0.2 changes (theme + OCR-cache toggle)
+
+`RunConfig` gained `ocr_cache: bool = True` — when False the run bypasses the content-addressed OCR cache and always re-OCRs (CLI `--no-ocr-cache`, web 'Use OCR cache' checkbox). Echoed in `Meta.flags`.
+

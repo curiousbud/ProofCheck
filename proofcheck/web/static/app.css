@@ -60,6 +60,33 @@ a.report, a.rowlink { color:var(--link); }
 .src { font-size:.74rem; font-weight:600; padding:.1rem .45rem; border-radius:4px; white-space:nowrap; }
 .src-ocr { background:#ede7f6; color:#5e35b1; } .src-text { background:#eef3f8; color:#37474f; }
 .src-none { color:#9e9e9e; }
+
+/* Theme toggle button (header is dark in both themes). */
+.theme-btn { background:rgba(255,255,255,.12); color:#fff; border:0; border-radius:6px; padding:.3rem .65rem; font-size:.85rem; cursor:pointer; }
+.theme-btn:hover { background:rgba(255,255,255,.22); }
+
+/* ---- Dark mode: override the palette + the few hard-coded light colors. ---- */
+[data-theme="dark"] {
+  --bg:#15171c; --card:#1e2127; --border:#333842; --ink:#e6e6e8; --muted:#9aa0aa; --link:#7aa2f7;
+}
+[data-theme="dark"] input[type=file],
+[data-theme="dark"] input[type=text],
+[data-theme="dark"] input[type=password],
+[data-theme="dark"] input[type=number],
+[data-theme="dark"] select,
+[data-theme="dark"] .toolbar input[type=search] { background:#262a31; color:var(--ink); border-color:var(--border); }
+[data-theme="dark"] th { background:#262a31; }
+[data-theme="dark"] .card { background:#262a31; }
+[data-theme="dark"] .lead { background:#1b2330; border-color:#2b3a52; }
+[data-theme="dark"] .history-row:hover td { background:#222834; }
+[data-theme="dark"] button.primary { background:#2d72d9; }
+[data-theme="dark"] .banner { background:#2a2410; border-color:#5c5320; color:#f0e3b0; }
+[data-theme="dark"] .banner.err { background:#3a1d1d; border-color:#7d3b3b; color:#f3c9c9; }
+[data-theme="dark"] .banner.ok { background:#16301f; border-color:#2f6b45; color:#bfe9cf; }
+[data-theme="dark"] del { background:#5a2a2a; color:#ffd7d5; }
+[data-theme="dark"] ins { background:#244a30; color:#d7f5dd; }
+[data-theme="dark"] .src-text { background:#2a313a; color:#b7c2cf; }
+[data-theme="dark"] .src-ocr { background:#2e2840; color:#c5b6ef; }
 .auth-wrap { max-width:380px; margin:3rem auto; }
 .danger { background:none; border:0; color:var(--missing); cursor:pointer; font-size:.8rem; }
 .danger:hover { text-decoration:underline; }

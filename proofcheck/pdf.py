@@ -71,11 +71,13 @@ def extract(
     ocr_dpi: int = 300,
     ocr_lang: str = "eng",
     ocr_psm: int = 3,
+    use_cache: bool = True,
 ) -> PdfText:
     """Extract text from every page of the PDF at ``path``.
 
     With ``ocr=True``, pages that have no embedded text layer are OCR'd as a fallback
     (when the optional OCR support is installed); otherwise they are reported as empty.
+    ``use_cache=False`` forces a fresh OCR even if a cached result exists.
     """
     result = PdfText()
     try:
@@ -91,12 +93,13 @@ def extract(
         raise PdfError(f"Could not read PDF file: {exc}") from exc
 
     if ocr and result.empty_pages:
-        _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm)
+        _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm, use_cache=use_cache)
 
     return result
 
 
-def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 3) -> None:
+def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 3,
+               use_cache: bool = True) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
 
     Uses the content-addressed OCR cache first: an identical file (same bytes, dpi, lang)
@@ -108,7 +111,7 @@ def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 3)
     """
     from . import ocr as ocr_mod, ocr_cache
 
-    use_cache = ocr_cache.enabled()
+    use_cache = use_cache and ocr_cache.enabled()
     digest = ocr_cache.file_sha256(path) if use_cache else None
     recovered = ocr_cache.load(digest, dpi=dpi, lang=lang, psm=psm) if use_cache else None
 

@@ -99,6 +99,8 @@ function checkView() {
         <label><input type="checkbox" id="reverse"> Reverse word order</label>
         <label><input type="checkbox" id="all_columns"> Check all columns</label>
         <label><input type="checkbox" id="ocr"> OCR scanned pages ${ocrNote}</label>
+        <label title="When on, an unchanged file reuses its previous OCR text instead of re-running OCR.">
+          <input type="checkbox" id="ocr_cache" checked> Use OCR cache</label>
       </div>
       <div id="ocrOpts" class="row hidden" style="margin-top:.5rem;">
         <div class="field" style="max-width:160px;"><label for="ocr_lang">OCR language(s)</label>
@@ -226,6 +228,7 @@ function wireCheck() {
     fd.append("ocr_lang", $("ocr_lang").value || "eng");
     fd.append("ocr_dpi", $("ocr_dpi").value || "300");
     fd.append("ocr_psm", $("ocr_psm").value || "3");
+    fd.append("ocr_cache", $("ocr_cache").checked);
 
     const btn = $("run");
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Running…';
@@ -483,6 +486,26 @@ function setActiveNav(route) {
 
 function redirectLogin() { location.hash = "#/login"; }
 
+// ---- theme (dark / light) ---------------------------------------------------
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const btn = document.getElementById("themeBtn");
+  if (btn) btn.textContent = theme === "dark" ? "☀️ Light" : "🌙 Dark";
+  try { localStorage.setItem("proofcheck-theme", theme); } catch (_) { /* private mode */ }
+}
+function initTheme() {
+  let theme = null;
+  try { theme = localStorage.getItem("proofcheck-theme"); } catch (_) { /* ignore */ }
+  if (!theme) {
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    theme = prefersDark ? "dark" : "light";
+  }
+  applyTheme(theme);
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+}
+
 async function router() {
   const hash = location.hash || "#/check";
   const parts = hash.replace(/^#\//, "").split("/");
@@ -501,6 +524,8 @@ async function router() {
 }
 
 async function boot() {
+  initTheme();
+  document.getElementById("themeBtn").addEventListener("click", toggleTheme);
   document.getElementById("logoutBtn").addEventListener("click", async () => {
     try { await api.logout(); } catch (_) { /* ignore */ }
     state.user = { username: "", authenticated: false };

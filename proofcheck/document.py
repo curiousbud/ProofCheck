@@ -23,12 +23,14 @@ def extract(
     ocr_dpi: int = 300,
     ocr_lang: str = "eng",
     ocr_psm: int = 3,
+    use_cache: bool = True,
 ) -> PdfText:
     """Route to the image OCR path or the PDF path based on ``path``."""
     if images.is_image_input(path):
         # Images have no text layer, so OCR is implied regardless of the ``ocr`` flag.
-        return images.extract(path, ocr_lang=ocr_lang, ocr_psm=ocr_psm)
-    return pdf.extract(path, ocr=ocr, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang, ocr_psm=ocr_psm)
+        return images.extract(path, ocr_lang=ocr_lang, ocr_psm=ocr_psm, use_cache=use_cache)
+    return pdf.extract(path, ocr=ocr, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang, ocr_psm=ocr_psm,
+                       use_cache=use_cache)
 
 
 __all__ = ["extract", "is_image_input", "PdfError", "PdfText"]

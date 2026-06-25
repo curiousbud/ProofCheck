@@ -342,3 +342,8 @@ v0.2: mounts `/static` (StaticFiles) for the SPA assets; `/` still serves index.
 
 `/api/check` now accepts a single **image** upload as well as a PDF (`DOC_EXTS` = PDF + image extensions); the upload is saved with its real extension so `document.extract` routes it correctly. A folder of images is a CLI feature (single upload only on the web).
 
+
+## v0.2 changes (theme + OCR-cache toggle)
+
+`/api/check` accepts an `ocr_cache` form field (default 'true'); False bypasses the OCR cache for that run. The extract path threads `use_cache` through document/pdf/images.
+

@@ -295,3 +295,8 @@ The disposable UI is now a framework-free SPA across three files: `index.html` (
 
 Results table gained a 'Matched via' column (Text layer / OCR badge per row, `sourceBadge`), a legend entry, and an OCR page-layout (PSM) selector that posts `ocr_psm`.
 
+
+## v0.2 changes (theme + OCR-cache toggle)
+
+Header gained a **dark/light theme** toggle button (#themeBtn): app.js initTheme/applyTheme/toggleTheme set data-theme on <html>, persist to localStorage, and default to the OS prefers-color-scheme; app.css has a [data-theme='dark'] palette override. The Check form gained a **'Use OCR cache'** checkbox that posts ocr_cache (default on; uncheck to force fresh OCR).
+

@@ -42,6 +42,7 @@ HTML / xlsx reports plus a swappable web UI.
 - [x] **Auth** — `web/auth.py` (PBKDF2 hashes + HMAC session cookies); `POST /api/auth/{login,logout,register}`, `GET /api/auth/me`; opt-in via `PROOFCHECK_AUTH`
 - [x] **Persistent run history** — `web/store.py` (stdlib sqlite); `GET /api/history`, `GET/DELETE /api/history/{run_id}`
 - [x] `web/static/` — **real hash-routed SPA** (`index.html` + `app.js` + `app.css`): Login / Check / History views, all over the same `/api/*` contract
+- [x] SPA **dark / light mode** toggle (persisted in localStorage, follows OS preference) + **"Use OCR cache"** checkbox (per-run `ocr_cache` flag; CLI `--no-ocr-cache`)
 
 ## Ops / production touches (MVP-appropriate)
 - [x] Validate file extensions (.xlsx/.xlsm, .pdf) -> 400

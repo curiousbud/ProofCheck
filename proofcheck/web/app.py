@@ -281,6 +281,7 @@ async def check(
     ocr_lang: str = Form("eng"),
     ocr_dpi: int = Form(300),
     ocr_psm: int = Form(3),
+    ocr_cache: str = Form("true"),
     user: str = Depends(auth.current_user),
 ) -> JSONResponse:
     """Run a full check and return the documented JSON shape + report download URLs."""
@@ -312,6 +313,7 @@ async def check(
             ocr_lang=ocr_lang or "eng",
             ocr_dpi=ocr_dpi,
             ocr_psm=ocr_psm,
+            ocr_cache=_parse_bool(ocr_cache),
         )
         result = pipeline_run(config)
 

@@ -77,6 +77,7 @@ class RunConfig:
     ocr_dpi: int = 300                # render DPI for OCR (higher = slower, more accurate)
     ocr_lang: str = "eng"             # Tesseract language pack(s), e.g. "eng" or "eng+ara"
     ocr_psm: int = 3                  # Tesseract page-segmentation mode (3 = automatic)
+    ocr_cache: bool = True            # reuse cached OCR for unchanged files (off = always re-OCR)
 
 
 @dataclass
