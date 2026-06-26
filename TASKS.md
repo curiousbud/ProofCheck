@@ -11,7 +11,7 @@ HTML / xlsx reports plus a swappable web UI.
 - [x] `excel.py` — load workbook, inspect sheets/headers, read column values per row
 - [x] `pdf.py` — per-page text extraction, detect pages with no text layer (warnings), **optional OCR fallback**
 - [x] `ocr.py` — **optional, deterministic Tesseract OCR** for no-text-layer (scanned) pages; graceful no-op when absent
-- [x] `ocr.py` — **robust multi-strategy engine**: grayscale+autocontrast, **Otsu binarization**, and **alpha-channel text mask** (for transparent logo/gradient PNGs) × page-segmentation modes; keep the most *readable* result (confidence-weighted length); early-exit; LSTM `--oem 3`, configurable `--ocr-psm`; **`diagnose()`** reports text + confidence + winning strategy + saved images
+- [x] `ocr.py` — **robust multi-strategy engine**: grayscale+autocontrast, **Otsu binarization**, **channel-minimum** (`min(R,G,B)`, turns gold/gradient/outlined *coloured* logo text into solid dark glyphs instead of hollow outlines), and **alpha-channel text mask** (for transparent logo/gradient PNGs) × page-segmentation modes (**default psm 6** = single block, reads multi-line logo pages whole); keep the most *readable* result (confidence-weighted length); early-exit; LSTM `--oem 3`, configurable `--ocr-psm`; **`diagnose()`** reports text + confidence + winning strategy + saved images
 - [x] `images.py` + `document.py` — **image & image-folder input** (each image = one OCR'd page); `check`/`ocr` accept a PDF, an image, or a directory of images; web accepts a single image upload
 - [x] CLI **`proofcheck ocr`** — diagnostics command to verify OCR output/confidence per page
 - [x] `MatchResult.source` (`text`/`OCR`) — surfaced as a **"Matched via"** column in the web UI + HTML + xlsx reports

@@ -107,3 +107,32 @@ the signal.
 
 Engine v3: `_preprocess_variants` now also emits an **alpha** variant for transparent images (uses the alpha channel directly as a black-on-white text mask — nails outlined/gradient logo PNGs). Scoring switched from 'sum of high-confidence words' to **readable mass** (sum of word length x confidence) so a full lower-confidence name beats a short high-confidence fragment. `_best_ocr` loops page-segmentation-mode-outer with an **early exit** once a confident read (mean conf >= 80, >=1 word) is found, bounding passes. New `ocr_image_file` / `diagnose_image_file` / `_load_image_file` handle loose image files; `_render_page` now returns the raw render and `_flatten_to_gray` is shared. `PageDiagnostic` gained `name` (image filename).
 
+## v0.3 changes (coloured-logo readability: channel-minimum + psm 6 default)
+
+The biggest real-world accuracy fix for opaque **coloured** logo lettering (gold / gradient
+fills with a thin dark outline on a white background — extremely common on certificate and
+title pages). Two changes:
+
+- **`_min_channel(image)` + a new `colormin` variant.** Standard luminance grayscale
+  (`0.299R+0.587G+0.114B`) maps a bright, saturated fill (gold, yellow, cyan, light green)
+  to a value *near white*, so the letters collapse to **hollow outlines** and Tesseract
+  reads gibberish (e.g. `CR ENTERPRISES` → `CR ENT EReRiSe`). Taking the per-pixel
+  **`min(R,G,B)`** instead maps any saturated colour to a low (dark) value while leaving a
+  white background near 255 — turning coloured text into **solid dark glyphs**. For neutral
+  (gray) pixels `min == luminance`, so ordinary black-on-white scans are unchanged; the
+  variant is skipped entirely for true-grayscale images (`mode in L/1/I/F`). Implemented
+  numpy-free with `PIL.ImageChops.darker`, then Otsu-binarized — same deterministic pipeline
+  as the other variants.
+- **`DEFAULT_PSM` is now `6`** (a single uniform text block) with `3`/`4` as fallbacks (was
+  `3` primary). For this tool's domain — sparse, centred title/logo pages — psm 3 (automatic)
+  often returns *nothing* or stops after the first line, while psm 6 reads the whole
+  multi-line block. Leading the rotation with psm 6 also makes the conf>=80 early-exit fire
+  on a *complete* read instead of a high-confidence partial. The CLI/web/`RunConfig` defaults
+  were updated to match (`--ocr-psm` default 6).
+
+Measured on a 17-page gold-logo proof (`PROOF1.pdf`): dealership-name matches went from
+**0/17 → 12/17** and owner-name from **2/17 → 11/17**; the only remaining misses are
+genuinely stylized 3D/metallic *display* fonts (still beyond Tesseract — the documented hard
+limit). Cost: `colormin` adds one more preprocessing pass per psm round on colour images
+(skipped on grayscale), amortized by the OCR cache on re-runs.
+

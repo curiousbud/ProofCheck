@@ -76,7 +76,7 @@ class RunConfig:
     ocr: bool = False                 # OCR no-text-layer pages as a fallback (deterministic Tesseract)
     ocr_dpi: int = 300                # render DPI for OCR (higher = slower, more accurate)
     ocr_lang: str = "eng"             # Tesseract language pack(s), e.g. "eng" or "eng+ara"
-    ocr_psm: int = 3                  # Tesseract page-segmentation mode (3 = automatic)
+    ocr_psm: int = 6                  # Tesseract page-segmentation mode (6 = single block)
     ocr_cache: bool = True            # reuse cached OCR for unchanged files (off = always re-OCR)
 
 

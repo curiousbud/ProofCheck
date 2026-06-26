@@ -48,7 +48,7 @@ def list_images(path: str) -> list[str]:
     return [path] if is_image_file(path) else []
 
 
-def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 3,
+def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
             use_cache: bool = True) -> PdfText:
     """Build a :class:`PdfText` by OCR'ing the image(s) at ``path`` (file or directory).
 

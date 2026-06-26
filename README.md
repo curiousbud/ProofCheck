@@ -47,15 +47,17 @@ All normalization is deterministic and applied to both sides before comparison:
 - **Works on images too.** Point `check` at a single image or a **folder of images** (PNG/
   JPG/TIFF/…) — each image is treated as a one-page scan and OCR'd. See *Input formats* above.
 - **Tuned for accuracy & robustness.** Each page is preprocessed deterministically (flatten
-  onto white → grayscale → auto-contrast, **Otsu binarization** for noisy scans, and — for
-  transparent images — the **alpha channel used directly as the text mask**, which nails
-  outlined/gradient logo text). OCR is tried with **several strategies** (preprocessings ×
-  page-segmentation modes) and the **most readable** result wins — scored by confidence-
-  weighted text length, so a full name beats a short high-confidence fragment. (This also
-  fixes a real failure mode where automatic segmentation returns nothing on sparse pages.)
-  Recognition uses the LSTM engine.
+  onto white → grayscale → auto-contrast, **Otsu binarization** for noisy scans, a
+  **channel-minimum** (`min(R,G,B)`) pass that turns **coloured logo lettering** — gold /
+  gradient / outlined fills that plain grayscale would wash out to hollow outlines — into
+  solid dark glyphs, and — for transparent images — the **alpha channel used directly as the
+  text mask**). OCR is tried with **several strategies** (preprocessings × page-segmentation
+  modes) and the **most readable** result wins — scored by confidence-weighted text length,
+  so a full name beats a short high-confidence fragment. (This also fixes a real failure mode
+  where automatic segmentation returns nothing on sparse pages.) Recognition uses the LSTM engine.
 - Tunable: **`--ocr-lang`** (e.g. `eng+ara`), **`--ocr-dpi`** (default 300; raise for small
-  text), and **`--ocr-psm`** (page layout: auto / single block / columns / sparse).
+  text), and **`--ocr-psm`** (page layout; **default 6** = single block, which reads
+  multi-line title/logo pages whole — override with auto (3) / columns (4) / sparse (11)).
 - **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text, **mean confidence**,
   and the winning **strategy** per page; `--save-images DIR` dumps exactly what Tesseract saw.
 - **Limits.** Tesseract is trained on ordinary document fonts. Heavily stylized **display /
@@ -128,7 +130,7 @@ All normalization is deterministic and applied to both sides before comparison:
   JSON contract (`web/schemas.py`).
 - **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
   create a virtualenv, install the package, and run the tests in one command.
-- **Deterministic test suite** (58 tests) with fixtures generated on the fly — no committed
+- **Deterministic test suite** (60 tests) with fixtures generated on the fly — no committed
   binaries. OCR tests pass with or without the engine installed.
 
 ---
@@ -193,7 +195,7 @@ proofcheck check delegates.xlsx program.pdf \
     --html report.html --xlsx report.xlsx
 
 # OCR scanned / image-only pages before matching (needs the Tesseract engine)
-proofcheck check scan.xlsx scan.pdf --column "Name" --ocr --ocr-lang eng --ocr-dpi 300 --ocr-psm 3
+proofcheck check scan.xlsx scan.pdf --column "Name" --ocr --ocr-lang eng --ocr-dpi 300 --ocr-psm 6
 
 # Diagnose OCR: see the recovered text + confidence per page (and save the images OCR saw)
 proofcheck ocr scan.pdf --full-text --save-images ./ocr-debug
@@ -409,7 +411,7 @@ Full per-file deep-dives live in [`proofcheckdocumentation/`](proofcheckdocument
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 58 tests
+pytest          # 60 tests
 ```
 
 OCR tests cover both the real graceful-degradation path and a monkeypatched recovery path,

@@ -8,11 +8,16 @@ generative model, and the same image rendered the same way always yields the sam
 OCR is attempted with several deterministic *strategies* and the most confident result is
 kept:
 
-  * two preprocessings — grayscale + auto-contrast, and Otsu **binarization** (clean
-    black-on-white, which Tesseract reads best on noisy/low-contrast scans);
-  * several page-segmentation modes (the requested ``--ocr-psm`` plus a single-block
-    fallback) — important because automatic segmentation (psm 3) sometimes returns nothing
-    on sparse pages.
+  * several preprocessings — grayscale + auto-contrast, Otsu **binarization** (clean
+    black-on-white, which Tesseract reads best on noisy/low-contrast scans), an Otsu over
+    the **channel-minimum** (``min(R,G,B)``) that turns *coloured* logo lettering — gold /
+    gradient / outlined fills that luminance grayscale washes almost white — into solid
+    dark glyphs, and (for transparent images) the alpha channel used directly as the text
+    mask;
+  * several page-segmentation modes — the default is **psm 6** (a single uniform text
+    block), which reads multi-line title/logo pages whole; ``--ocr-psm`` overrides it and
+    psm 3/4 are tried as fallbacks, important because automatic segmentation (psm 3)
+    sometimes returns nothing on sparse, centred pages.
 
 The winner is chosen by how much *confident* text it produced, so a page that one strategy
 fails on is recovered by another. All of this is deterministic (a fixed strategy set + a
@@ -43,20 +48,25 @@ except Exception:  # pragma: no cover - exercised only without the optional dep
 
 try:
     import pytesseract as _pytesseract
-    from PIL import Image as _Image, ImageOps as _ImageOps
+    from PIL import Image as _Image, ImageChops as _ImageChops, ImageOps as _ImageOps
 except Exception:  # pragma: no cover - exercised only without the optional dep
     _pytesseract = None
     _Image = None
+    _ImageChops = None
     _ImageOps = None
 
 
 DEFAULT_DPI = 300        # 300 DPI is the conventional sweet spot for Tesseract accuracy.
 DEFAULT_LANG = "eng"     # Tesseract language pack(s); e.g. "eng", "ara", "eng+ara".
-DEFAULT_PSM = 3          # page segmentation: 3 = fully automatic (Tesseract's default).
+DEFAULT_PSM = 6          # page segmentation: 6 = a single uniform block of text. For this
+                         # tool's domain (no-text-layer pages: certificates, logo/title
+                         # pages, simple scans) psm 6 reads multi-line blocks whole, whereas
+                         # Tesseract's automatic mode (3) often returns nothing on sparse,
+                         # centred pages or stops after the first line. 3/4 stay as fallbacks.
 DEFAULT_OEM = 3          # OCR engine mode: 3 = default (LSTM neural engine).
-# Page-segmentation modes to fall back to (after the requested one). 6 = single uniform
-# block, 4 = variable-size columns: between them they rescue most pages psm 3 misses.
-_PSM_FALLBACKS = (6, 4)
+# Page-segmentation modes to fall back to (after the requested one). 3 = fully automatic,
+# 4 = variable-size columns: between them they rescue pages the primary mode misses.
+_PSM_FALLBACKS = (3, 4)
 _GOOD_CONF = 80          # a result this confident (with text) ends the strategy search early.
 _PDF_POINTS_PER_INCH = 72.0
 
@@ -188,6 +198,26 @@ def _flatten_to_gray(image):
     return image.convert("L")
 
 
+def _min_channel(image):
+    """Per-pixel ``min(R, G, B)`` as a grayscale ('L') image, transparency flattened on white.
+
+    Standard luminance grayscale (0.299R+0.587G+0.114B) makes bright, saturated fills — gold,
+    yellow, cyan, light green — almost as light as a white background, so coloured *logo*
+    lettering with a thin dark outline collapses to hollow outlines that Tesseract reads
+    poorly. Taking the channel minimum instead maps any saturated colour to a low (dark)
+    value while leaving white near 255, turning coloured text on a light background into
+    solid dark glyphs. For neutral (gray) pixels min == the gray level, so ordinary
+    black-on-white scans are unaffected. Deterministic and numpy-free.
+    """
+    if image.mode in ("RGBA", "LA", "P"):
+        rgba = image.convert("RGBA")
+        background = _Image.new("RGB", rgba.size, (255, 255, 255))
+        background.paste(rgba, mask=rgba.split()[-1])
+        image = background
+    r, g, b = image.convert("RGB").split()
+    return _ImageChops.darker(_ImageChops.darker(r, g), b)
+
+
 def _render_page(document, page_index: int, *, dpi: int):
     """Render one PDF page to a PIL image (RGB on white; pdfium has no alpha)."""
     scale = dpi / _PDF_POINTS_PER_INCH
@@ -248,14 +278,23 @@ def _preprocess_variants(image):
     """Deterministic preprocessings to try, as ``(name, image)`` pairs.
 
     'contrast' suits clean digital renders; 'binary' (Otsu) suits noisy/low-contrast scans;
-    'alpha' uses a transparent image's alpha channel directly as the text mask — the cleanest
-    possible input for logos/PNGs with a transparent background (e.g. gradient/outlined text),
-    independent of the fill colour.
+    'colormin' (Otsu over the channel-minimum) rescues *coloured* lettering on a light
+    background — gold/gradient/outlined logos that luminance grayscale would wash out to
+    hollow outlines (see :func:`_min_channel`); 'alpha' uses a transparent image's alpha
+    channel directly as the text mask — the cleanest possible input for logos/PNGs with a
+    transparent background (e.g. gradient/outlined text), independent of the fill colour.
     """
     gray = _flatten_to_gray(image)
     contrast = _ImageOps.autocontrast(gray)
     binary = contrast.point(lambda p: 255 if p > _otsu_threshold(contrast) else 0)
     variants = [("contrast", contrast), ("binary", binary)]
+
+    # Coloured text on a light background: only meaningful when the image actually has
+    # colour (channel min differs from luminance), so skip it for true grayscale scans.
+    if image.mode not in ("L", "1", "I", "F"):
+        mn = _min_channel(image)
+        mn_binary = mn.point(lambda p: 255 if p > _otsu_threshold(mn) else 0)
+        variants.append(("colormin", mn_binary))
 
     if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
         alpha = image.convert("RGBA").split()[-1]

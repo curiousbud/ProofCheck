@@ -205,7 +205,7 @@ the project's core contract.
 
 ### Current state (as of this guide)
 - Full core engine, CLI, web API + SPA, reports, and tests are implemented (v0.2.0).
-- **58 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
+- **60 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
 - v0.2 added: **optional deterministic OCR** fallback (`ocr.py`) with a **content-addressed
   cache** (`ocr_cache.py`, never OCR an unchanged file twice), **diacritic folding**
   (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), **opt-in auth +
@@ -225,7 +225,7 @@ bash scripts/setup.sh                                  # Linux/macOS
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"                  # core + test deps (the dev extra includes OCR libs)
 # pip install -e ".[ocr]"                # OCR libs only; also needs the Tesseract *binary* on PATH
-pytest                                   # 49 tests
+pytest                                   # 60 tests
 proofcheck inspect file.xlsx             # list sheets/headers
 proofcheck check file.xlsx file.pdf -c "Name" --reverse --fold-diacritics --html out.html
 proofcheck check scan.xlsx scan.pdf -c "Name" --ocr --ocr-lang eng --ocr-dpi 300   # OCR scanned pages
@@ -261,10 +261,13 @@ PROOFCHECK_AUTH=on PROOFCHECK_ADMIN_USER=admin PROOFCHECK_ADMIN_PASSWORD=secret1
   unchanged file is never OCR'd twice and a changed file (different hash) is OCR'd fresh.
   The cache is an optimization only — it returns exactly what OCR would have produced.
 - **OCR engine** (`ocr.py`) is **multi-strategy + deterministic**: per page it tries several
-  preprocessings (flatten→grayscale→autocontrast, Otsu **binary**, and — for transparent
-  images — the **alpha channel as the text mask**) × page-segmentation modes, and keeps the
-  most *readable* result (confidence-weighted text length, so a full name beats a short
-  high-confidence fragment). It early-exits once a confident read is found (bounded passes).
+  preprocessings (flatten→grayscale→autocontrast, Otsu **binary**, the **channel-minimum**
+  `min(R,G,B)` Otsu — turns gold/gradient/outlined *coloured* logo text into solid dark
+  glyphs that luminance grayscale would wash out to hollow outlines — and, for transparent
+  images, the **alpha channel as the text mask**) × page-segmentation modes (**default psm 6**
+  = a single uniform block, so multi-line title/logo pages read whole; psm 3/4 are fallbacks),
+  and keeps the most *readable* result (confidence-weighted text length, so a full name beats
+  a short high-confidence fragment). It early-exits once a confident read is found (bounded passes).
   `ocr.diagnose()` / `proofcheck ocr` report per-page text + confidence + winning strategy and
   can dump the images fed to OCR. Hard limit: stylized 3D/metallic *display* fonts are beyond
   Tesseract — low confidence is the signal.

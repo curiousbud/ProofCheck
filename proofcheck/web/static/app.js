@@ -109,8 +109,8 @@ function checkView() {
           <input type="number" id="ocr_dpi" value="300" min="72" max="1200" step="50"></div>
         <div class="field" style="max-width:220px;"><label for="ocr_psm">Page layout (PSM)</label>
           <select id="ocr_psm">
-            <option value="3" selected>Automatic (3)</option>
-            <option value="6">Single block (6)</option>
+            <option value="6" selected>Single block (6)</option>
+            <option value="3">Automatic (3)</option>
             <option value="4">Columns (4)</option>
             <option value="11">Sparse text (11)</option>
           </select></div>
@@ -227,7 +227,7 @@ function wireCheck() {
     fd.append("ocr", $("ocr").checked);
     fd.append("ocr_lang", $("ocr_lang").value || "eng");
     fd.append("ocr_dpi", $("ocr_dpi").value || "300");
-    fd.append("ocr_psm", $("ocr_psm").value || "3");
+    fd.append("ocr_psm", $("ocr_psm").value || "6");
     fd.append("ocr_cache", $("ocr_cache").checked);
 
     const btn = $("run");

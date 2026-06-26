@@ -150,6 +150,35 @@ def _make_png(path):
     Image.new("RGB", (40, 20), "white").save(path)
 
 
+def test_min_channel_darkens_saturated_colour_text():
+    """The colormin fix: a bright gold fill must become *dark* (not near-white) so coloured
+    logo lettering survives binarization as solid glyphs instead of hollow outlines."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    gold = (212, 175, 55)  # a typical gold/gradient logo fill
+    img = Image.new("RGB", (8, 8), gold)
+    # Luminance grayscale washes gold almost white (~160/255) -> hollow letters.
+    lum = img.convert("L").getpixel((0, 0))
+    # Channel-minimum maps the same gold to its blue channel (~55) -> solidly dark.
+    mn = ocr._min_channel(img).getpixel((0, 0))
+    assert lum > 150          # luminance keeps gold light (the old failure)
+    assert mn < 80            # min-channel makes it dark (the fix)
+    assert mn == min(gold)    # exactly per-pixel min(R,G,B)
+
+
+def test_colormin_variant_present_for_colour_skipped_for_grayscale():
+    """`colormin` is offered for colour images and skipped for true-grayscale ones."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    colour = Image.new("RGB", (8, 8), (212, 175, 55))
+    names_colour = {name for name, _ in ocr._preprocess_variants(colour)}
+    assert "colormin" in names_colour
+
+    gray = Image.new("L", (8, 8), 180)
+    names_gray = {name for name, _ in ocr._preprocess_variants(gray)}
+    assert "colormin" not in names_gray  # redundant on grayscale -> skipped to save a pass
+
+
 def test_image_input_detection(tmp_path):
     d = tmp_path / "imgs"
     d.mkdir()

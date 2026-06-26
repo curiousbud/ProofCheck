@@ -64,8 +64,8 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
 @click.option("--ocr-dpi", default=300, show_default=True, type=click.IntRange(72, 1200),
               help="Render DPI used for OCR.")
 @click.option("--ocr-lang", default="eng", show_default=True, help="Tesseract language(s), e.g. 'eng+ara'.")
-@click.option("--ocr-psm", default=3, show_default=True, type=click.IntRange(0, 13),
-              help="Tesseract page-segmentation mode (3=auto, 6=block, 4=columns, 11=sparse).")
+@click.option("--ocr-psm", default=6, show_default=True, type=click.IntRange(0, 13),
+              help="Tesseract page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--no-ocr-cache", is_flag=True, help="Force fresh OCR (ignore the OCR cache).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
 @click.option("--xlsx", "xlsx_out", type=click.Path(dir_okay=False), help="Write an xlsx report here.")
@@ -160,8 +160,8 @@ def _parse_pages(spec: str, page_count: int) -> list[int]:
 @click.option("--all-pages", is_flag=True, help="OCR every page, even those with a text layer.")
 @click.option("--ocr-lang", default="eng", show_default=True, help="Tesseract language(s), e.g. 'eng+ara'.")
 @click.option("--ocr-dpi", default=300, show_default=True, type=click.IntRange(72, 1200))
-@click.option("--ocr-psm", default=3, show_default=True, type=click.IntRange(0, 13),
-              help="Page-segmentation mode (3=auto, 6=block, 4=columns, 11=sparse).")
+@click.option("--ocr-psm", default=6, show_default=True, type=click.IntRange(0, 13),
+              help="Page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--save-images", type=click.Path(file_okay=False),
               help="Directory to save the images fed to OCR (to see what Tesseract saw).")
 @click.option("--full-text", is_flag=True, help="Print the full OCR text for every page.")

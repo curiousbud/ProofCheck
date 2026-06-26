@@ -280,7 +280,7 @@ async def check(
     ocr: str = Form("false"),  # noqa: A002 - shadows the ocr module locally; resolved below
     ocr_lang: str = Form("eng"),
     ocr_dpi: int = Form(300),
-    ocr_psm: int = Form(3),
+    ocr_psm: int = Form(6),
     ocr_cache: str = Form("true"),
     user: str = Depends(auth.current_user),
 ) -> JSONResponse:

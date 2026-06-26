@@ -22,7 +22,7 @@ def extract(
     ocr: bool = False,
     ocr_dpi: int = 300,
     ocr_lang: str = "eng",
-    ocr_psm: int = 3,
+    ocr_psm: int = 6,
     use_cache: bool = True,
 ) -> PdfText:
     """Route to the image OCR path or the PDF path based on ``path``."""

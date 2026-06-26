@@ -70,7 +70,7 @@ def extract(
     ocr: bool = False,
     ocr_dpi: int = 300,
     ocr_lang: str = "eng",
-    ocr_psm: int = 3,
+    ocr_psm: int = 6,
     use_cache: bool = True,
 ) -> PdfText:
     """Extract text from every page of the PDF at ``path``.
@@ -98,7 +98,7 @@ def extract(
     return result
 
 
-def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 3,
+def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
                use_cache: bool = True) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
 
