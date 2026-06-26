@@ -136,3 +136,29 @@ genuinely stylized 3D/metallic *display* fonts (still beyond Tesseract — the d
 limit). Cost: `colormin` adds one more preprocessing pass per psm round on colour images
 (skipped on grayscale), amortized by the OCR cache on re-runs.
 
+## v0.3 changes (performance: the histogram bug + fewer Tesseract passes)
+
+OCR felt like it "ran forever" on multi-page PDFs. Profiling a single 300-DPI page
+(3509×2480) showed the culprit was **not** Tesseract (≈0.5–0.7s per pass) but
+**`_preprocess_variants`: ~25 s per page**. Cause: `_otsu_threshold(img)` was called *inside*
+the `.point()` LUT lambda, so PIL re-ran the full multi-megapixel histogram scan **256 times**
+(once per lookup-table entry) for every binarized variant. On a 17-page file that alone was
+~7 minutes before a single character was recognised.
+
+Fixes (all deterministic, output-preserving):
+
+- **Hoist the Otsu threshold out of the lambda** — compute it once per variant and capture it
+  (`point(lambda p, t=thr: ...)`). Variant build dropped **25.3 s → 0.26 s** (~100×).
+- **Fewer Tesseract passes via smarter early-exit.** `_best_ocr` now (a) checks the
+  confident-read exit (`conf >= _GOOD_CONF`, ≥1 word) after **each pass**, not only at the end
+  of a psm round, and (b) stops after the **primary psm round** once any substantial read
+  (`_ENOUGH_WORDS = 2`) exists — the fallback psm modes only rescue pages the primary mode read
+  nothing on, so re-running them on every page was pure waste. The `colormin` variant is also
+  listed **first** for colour images (its most likely winner), so a clean page exits after a
+  *single* pass.
+
+End-to-end on the 17-page proof (cold cache): **~180 s → ~93 s**; re-runs are a content-cache
+hit (**~0.1 s**). Lowering `--ocr-dpi` to 200 cuts it further (≈60 s) and, for these
+large-font logos, is often *more* accurate too — but 300 stays the default (best for small,
+dense printed text). Recovered text is byte-identical before/after these perf changes.
+

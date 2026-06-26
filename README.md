@@ -56,8 +56,14 @@ All normalization is deterministic and applied to both sides before comparison:
   so a full name beats a short high-confidence fragment. (This also fixes a real failure mode
   where automatic segmentation returns nothing on sparse pages.) Recognition uses the LSTM engine.
 - Tunable: **`--ocr-lang`** (e.g. `eng+ara`), **`--ocr-dpi`** (default 300; raise for small
-  text), and **`--ocr-psm`** (page layout; **default 6** = single block, which reads
+  text, **lower (e.g. 200) for faster — and often more accurate — OCR of large-font logo/
+  title pages**), and **`--ocr-psm`** (page layout; **default 6** = single block, which reads
   multi-line title/logo pages whole — override with auto (3) / columns (4) / sparse (11)).
+- **Speed.** OCR is the slow part of a run (rendering + Tesseract). The first run on a file
+  OCRs every no-text-layer page; **re-runs of the same file are an instant content-cache hit**
+  (no OCR). Each page tries a few deterministic strategies but **early-exits** as soon as it
+  gets a confident read, so clean pages cost a single Tesseract pass. For big multi-page PDFs,
+  a lower `--ocr-dpi` is the most effective speed knob.
 - **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text, **mean confidence**,
   and the winning **strategy** per page; `--save-images DIR` dumps exactly what Tesseract saw.
 - **Limits.** Tesseract is trained on ordinary document fonts. Heavily stylized **display /

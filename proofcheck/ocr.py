@@ -68,6 +68,8 @@ DEFAULT_OEM = 3          # OCR engine mode: 3 = default (LSTM neural engine).
 # 4 = variable-size columns: between them they rescue pages the primary mode misses.
 _PSM_FALLBACKS = (3, 4)
 _GOOD_CONF = 80          # a result this confident (with text) ends the strategy search early.
+_ENOUGH_WORDS = 2        # after the primary psm round, this many words ends the search too
+                         # (the fallback psm modes only help pages the primary read nothing on).
 _PDF_POINTS_PER_INCH = 72.0
 
 # Common locations the Tesseract engine lands in when it isn't on PATH (notably the
@@ -286,15 +288,23 @@ def _preprocess_variants(image):
     """
     gray = _flatten_to_gray(image)
     contrast = _ImageOps.autocontrast(gray)
-    binary = contrast.point(lambda p: 255 if p > _otsu_threshold(contrast) else 0)
-    variants = [("contrast", contrast), ("binary", binary)]
+    # NB: compute the Otsu threshold ONCE and capture it; calling it inside the point()
+    # lambda would re-scan the whole (multi-megapixel) histogram for all 256 LUT entries.
+    contrast_thr = _otsu_threshold(contrast)
+    binary = contrast.point(lambda p, t=contrast_thr: 255 if p > t else 0)
+    variants = []
 
     # Coloured text on a light background: only meaningful when the image actually has
     # colour (channel min differs from luminance), so skip it for true grayscale scans.
+    # Listed FIRST for colour images: it is the most likely winner for coloured/logo text,
+    # so the per-pass confidence early-exit can stop after a single Tesseract pass.
     if image.mode not in ("L", "1", "I", "F"):
         mn = _min_channel(image)
-        mn_binary = mn.point(lambda p: 255 if p > _otsu_threshold(mn) else 0)
+        mn_thr = _otsu_threshold(mn)
+        mn_binary = mn.point(lambda p, t=mn_thr: 255 if p > t else 0)
         variants.append(("colormin", mn_binary))
+
+    variants += [("contrast", contrast), ("binary", binary)]
 
     if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
         alpha = image.convert("RGBA").split()[-1]
@@ -337,10 +347,16 @@ def _best_ocr(image, *, lang: str, psm: int, oem: int):
     variants = _preprocess_variants(image)
 
     best = None  # (mass, words, text, mean_conf, label, image)
-    # Outer loop over page-segmentation modes so the requested mode is tried across every
-    # preprocessing first; only escalate to fallback modes if no confident read yet. This
-    # bounds the common case to a few Tesseract passes while staying deterministic.
-    for ps in psms:
+    # Outer loop over page-segmentation modes so the requested (primary) mode is tried across
+    # every preprocessing first; the fallback modes are only an escalation for pages the
+    # primary mode read (almost) nothing on. Two deterministic stop conditions keep the
+    # common case to a single psm round (one pass per variant) instead of the full product:
+    #   * a confident read (conf >= _GOOD_CONF) in any round — clearly done;
+    #   * after the primary round, ANY substantial read (>= _ENOUGH_WORDS words) — the
+    #     fallback modes essentially never beat a primary mode that already produced real
+    #     text, and re-running them on every page is what made OCR slow.
+    confident = False
+    for round_index, ps in enumerate(psms):
         for prep_name, prep_img in variants:
             cfg = f"--oem {int(oem)} --psm {int(ps)}"
             data = _pytesseract.image_to_data(prep_img, lang=lang, config=cfg, output_type=Output.DICT)
@@ -348,8 +364,13 @@ def _best_ocr(image, *, lang: str, psm: int, oem: int):
             cand = (mass, words, text, mean_conf, f"{prep_name}/psm{ps}", prep_img)
             if best is None or (cand[0], cand[1]) > (best[0], best[1]):
                 best = cand
-        if best is not None and best[3] >= _GOOD_CONF and best[1] >= 1:
-            break  # confident result with real text — no need to try more segmentation modes
+            if best[3] >= _GOOD_CONF and best[1] >= 1:
+                confident = True
+                break  # a confident read — stop immediately, even mid-round
+        if confident:
+            break
+        if round_index == 0 and best is not None and best[1] >= _ENOUGH_WORDS:
+            break  # primary mode already produced substantial text — fallbacks won't help
     _mass, words, text, mean_conf, label, image_used = best
     return text, mean_conf, words, label, image_used
 
