@@ -48,7 +48,7 @@ Full pinning and packaging: [`docs/pyproject_EXPLAINED.md`](docs/pyproject_EXPLA
 ## 3. File-structure diagram
 
 ```
-Proof-Reader/
+ProofCheck/
 ├── claude.md                     ← you are here (index + continuation brief)
 ├── dependency-graph.html         ← interactive, editable import graph (open in a browser)
 ├── README.md                     ← user-facing usage / API contract
