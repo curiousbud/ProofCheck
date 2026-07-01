@@ -106,7 +106,7 @@ On a fresh Ubuntu/Debian box:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y python3-venv tesseract-ocr nginx
-git clone https://github.com/Spade-IT/Proof-Reader.git /opt/proofcheck
+git clone https://github.com/Spade-IT/ProofCheck.git /opt/proofcheck
 cd /opt/proofcheck
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[ocr]"
