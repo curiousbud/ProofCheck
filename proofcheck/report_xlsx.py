@@ -9,11 +9,28 @@ the HTML report and web UI.
 from __future__ import annotations
 
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from . import humanize
 from .models import RunResult, Status
+
+
+def _clean(value):
+    """Strip control chars openpyxl rejects (OCR text can contain them); pass-through others.
+
+    Excel/openpyxl forbid most C0 control characters in cell text (``\\x00-\\x08``,
+    ``\\x0b``, ``\\x0c``, ``\\x0e-\\x1f``); tab/newline/carriage-return are fine. OCR output
+    occasionally emits one of the forbidden ones, which otherwise crashes the whole report
+    with ``IllegalCharacterError``. Only strings are touched.
+    """
+    return ILLEGAL_CHARACTERS_RE.sub("", value) if isinstance(value, str) else value
+
+
+def _append(ws, values) -> None:
+    """``ws.append`` with every string cell sanitized against illegal control chars."""
+    ws.append([_clean(v) for v in values])
 
 # Solid fills matching the shared status palette.
 _FILLS = {
@@ -47,7 +64,7 @@ def build(result: RunResult) -> Workbook:
     s = result.summary
     summary_ws.append(["ProofCheck results"])
     summary_ws["A1"].font = Font(bold=True, size=14)
-    summary_ws.append([humanize.summary_sentence(result)])
+    _append(summary_ws, [humanize.summary_sentence(result)])
     summary_ws.append([])
     rows = [
         ("Spreadsheet", result.meta.excel),
@@ -62,7 +79,7 @@ def build(result: RunResult) -> Workbook:
         ("Match rate", f"{s.pass_rate * 100:.0f}%"),
     ]
     for label_text, value in rows:
-        summary_ws.append([label_text, value])
+        _append(summary_ws, [label_text, value])
         if label_text:
             summary_ws.cell(row=summary_ws.max_row, column=1).font = _HEADER
 
@@ -71,7 +88,7 @@ def build(result: RunResult) -> Workbook:
         summary_ws.append(["Notes"])
         summary_ws.cell(row=summary_ws.max_row, column=1).font = _HEADER
         for w in result.warnings:
-            summary_ws.append(["", w])
+            _append(summary_ws, ["", w])
     _autosize(summary_ws)
 
     for col in result.columns:
@@ -82,7 +99,7 @@ def build(result: RunResult) -> Workbook:
         for cell in ws[1]:
             cell.font = _HEADER
         for r in col.results:
-            ws.append([
+            _append(ws, [
                 r.row,
                 r.expected,
                 f"{humanize.icon(r.status)} {humanize.label(r.status)}",
