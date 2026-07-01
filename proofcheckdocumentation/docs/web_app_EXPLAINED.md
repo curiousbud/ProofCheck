@@ -40,7 +40,7 @@ States the design contract up front: this module is an adapter only, and uploads
 
 ### Configuration: env vars and constants (lines 26–45)
 ```python
-MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "25"))
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "5120"))  # 5 GB default cap
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 CORS_ORIGINS = [
     o.strip()
@@ -51,7 +51,7 @@ CORS_ORIGINS = [
 ]
 REPORT_TTL_SECONDS = 60 * 60  # delete generated reports older than 1 hour
 ```
-- **`MAX_UPLOAD_MB`** — upload size cap in megabytes (default `25`); `MAX_UPLOAD_BYTES` is the byte form enforced while streaming uploads. Exceeding it yields **413**.
+- **`MAX_UPLOAD_MB`** — per-file upload size cap in megabytes (default `5120` = 5 GB); `MAX_UPLOAD_BYTES` is the byte form enforced while streaming uploads. Exceeding it yields **413**.
 - **`CORS_ORIGINS`** — comma-separated allowlist of origins (default localhost variants on port 8000), parsed into a clean list with blanks dropped.
 - **`REPORT_TTL_SECONDS`** — `3600` (1 hour). Cached report files older than this are pruned opportunistically.
 

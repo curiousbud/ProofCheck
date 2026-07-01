@@ -25,7 +25,7 @@ from ..pipeline import PipelineError, run as pipeline_run
 from . import auth, schemas, store
 
 # ---- Configuration (env-driven, MVP-appropriate defaults) -------------------
-MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "25"))
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "5120"))  # 5 GB default cap
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 CORS_ORIGINS = [
     o.strip()
