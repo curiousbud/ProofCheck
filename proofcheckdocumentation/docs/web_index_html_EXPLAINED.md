@@ -16,7 +16,7 @@ This file is the entire ProofCheck frontend: one self-contained HTML document wi
 The document is a fixed `<header>` (title + tagline) over a centered `<main>` containing three regions:
 
 - **Input panel** (`.panel`):
-  - **File inputs** — `#excel` (`accept=".xlsx,.xlsm"`) and `#pdf` (`accept=".pdf"`), side by side in a `.row`.
+  - **File inputs** — `#excel` (`accept=".xlsx,.xlsm"`) and `#pdf` (`accept=".pdf"`), side by side in a `.row`. The whole panel (`#checkPanel.dropzone`) also accepts **drag & drop** and **clipboard paste** (Ctrl/Cmd+V): dropped/pasted files are routed to the Excel or document slot by extension (falling back to MIME type, so a nameless pasted screenshot still lands in the document slot). See `acceptFiles`/`targetForFile`/`handlePaste` in `app.js`.
   - **Sheet dropdown** — `<select id="sheet">`, populated dynamically after inspecting the Excel file.
   - **Multi-select column picker** — `<select id="columns" multiple>` (min-height styled for visibility), with a muted hint to hold Ctrl/Cmd for multiple selection.
   - **Fuzzy threshold slider** — `<input type="range" id="threshold" min="0" max="100" value="90">` with a live readout in `#thresholdVal`.

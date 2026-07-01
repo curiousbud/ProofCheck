@@ -25,6 +25,12 @@ label { font-size:.8rem; font-weight:600; color:var(--muted); }
 input[type=file],input[type=text],input[type=password],input[type=number],select {
   padding:.45rem; border:1px solid var(--border); border-radius:6px; background:#fff; font:inherit; }
 select[multiple] { min-height:120px; }
+/* Drag & drop intake: highlight the panel while a file is dragged over it. */
+.dropzone { transition:outline-color .12s ease, background-color .12s ease; }
+.dropzone.dragging { outline:2px dashed var(--link); outline-offset:4px; background:rgba(26,86,219,.05); }
+.filehint { font-size:.75rem; color:var(--muted); margin:0 0 .9rem; }
+[data-theme="dark"] .dropzone.dragging { background:rgba(122,162,247,.08); }
+
 .checks { display:flex; gap:1.25rem; flex-wrap:wrap; align-items:center; }
 .checks label { font-weight:400; color:var(--ink); display:flex; gap:.4rem; align-items:center; }
 button.primary { background:#1a1a1a; color:#fff; border:0; border-radius:6px; padding:.6rem 1.2rem; font-size:.95rem; cursor:pointer; }

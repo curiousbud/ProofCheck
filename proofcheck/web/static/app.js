@@ -24,6 +24,67 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const view = () => document.getElementById("view");
 const clearView = () => { view().innerHTML = ""; };
 
+// ---- file intake (drag & drop + clipboard paste) ----------------------------
+// Both slots accept files by drop/paste, not just the native picker. Files are routed
+// to the Excel or document (PDF/image) input by extension, falling back to MIME type so
+// pasted screenshots (which arrive as a nameless image blob) still land correctly.
+const EXCEL_EXTS = new Set([".xlsx", ".xlsm"]);
+const DOC_EXTS = new Set([".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"]);
+const _MIME_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp", "image/tiff": "tiff", "application/pdf": "pdf" };
+
+const extOf = (name) => { const i = (name || "").lastIndexOf("."); return i < 0 ? "" : name.slice(i).toLowerCase(); };
+
+// Which input a dropped/pasted file belongs to, or null if it's neither kind.
+function targetForFile(file) {
+  const ext = extOf(file.name);
+  if (EXCEL_EXTS.has(ext)) return "excel";
+  if (DOC_EXTS.has(ext)) return "pdf";
+  const t = file.type || "";
+  if (t.startsWith("image/") || t === "application/pdf") return "pdf";
+  if (t.includes("spreadsheetml") || t.includes("ms-excel")) return "excel";
+  return null;
+}
+
+// The server validates by extension, so a nameless pasted blob needs a synthetic filename.
+function withName(file) {
+  if (extOf(file.name)) return file;
+  const ext = _MIME_EXT[file.type] || "png";
+  try { return new File([file], `pasted.${ext}`, { type: file.type || "application/octet-stream" }); }
+  catch (_) { return file; }
+}
+
+// Assign a File to a native <input type=file> and fire change so existing handlers run.
+function setInputFile(inputId, file) {
+  const input = document.getElementById(inputId);
+  if (!input) return false;
+  try { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; }
+  catch (_) { return false; }
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+// Route every usable file in a list to its slot; returns how many were accepted.
+function acceptFiles(fileList) {
+  let handled = 0;
+  for (const raw of Array.from(fileList || [])) {
+    const target = targetForFile(raw);
+    if (target && setInputFile(target, withName(raw))) handled++;
+  }
+  return handled;
+}
+
+// Clipboard paste (Ctrl/Cmd+V) anywhere on the Check view drops files into their slots.
+// Attached once at boot; a no-op unless the Check view's inputs are present.
+function handlePaste(ev) {
+  if (!document.getElementById("excel")) return;      // not on the Check view
+  const files = ev.clipboardData && ev.clipboardData.files;
+  if (files && files.length && acceptFiles(files)) {
+    ev.preventDefault();
+    const msgs = document.getElementById("msgs");
+    if (msgs) msgs.innerHTML = "";
+  }
+}
+
 function diffHtml(diff, best) {
   if (!diff || !diff.length) return esc(best || "");
   return diff.map(([op, text]) => {
@@ -75,13 +136,16 @@ function checkView() {
   const ocrNote = '<span id="ocrPill" class="pill"></span>';
 
   const root = el("div", {},
-    el("div", { class: "panel", html: `
+    el("div", { class: "panel dropzone", id: "checkPanel", html: `
       <div class="row">
         <div class="field"><label for="excel">Excel file (.xlsx / .xlsm)</label>
           <input type="file" id="excel" accept=".xlsx,.xlsm"></div>
         <div class="field"><label for="pdf">PDF or image (.pdf / .png / .jpg …)</label>
           <input type="file" id="pdf" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif"></div>
       </div>
+      <p class="filehint">Tip: you can also <b>drag &amp; drop</b> files anywhere on this panel, or
+        <b>copy a file/screenshot and paste</b> (Ctrl/Cmd + V). Spreadsheets go to the Excel slot;
+        PDFs and images to the document slot.</p>
       <div class="row">
         <div class="field" style="max-width:240px;"><label for="sheet">Sheet</label>
           <select id="sheet"></select></div>
@@ -168,6 +232,29 @@ function wireCheck() {
   // input's value when the picker opens guarantees `change` fires every time — even for the
   // same path — so the freshly-saved file content is always what gets read and sent.
   ["excel", "pdf"].forEach((id) => $(id).addEventListener("click", () => { $(id).value = ""; }));
+
+  // Drag & drop: dropping files anywhere on the panel routes each to its slot. The panel
+  // is recreated on every checkView(), so these listeners die with it — no leak.
+  const zone = $("checkPanel");
+  if (zone) {
+    const isFileDrag = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+    ["dragenter", "dragover"].forEach((evt) => zone.addEventListener(evt, (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      zone.classList.add("dragging");
+    }));
+    zone.addEventListener("dragleave", (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove("dragging"); });
+    zone.addEventListener("drop", (e) => {
+      if (!(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length)) return;
+      e.preventDefault();
+      zone.classList.remove("dragging");
+      $("msgs").innerHTML = "";
+      if (!acceptFiles(e.dataTransfer.files)) {
+        $("msgs").appendChild(banner("err", "Couldn't use the dropped file(s). Drop an Excel (.xlsx/.xlsm) or a PDF/image."));
+      }
+    });
+  }
 
   $("excel").addEventListener("change", async () => {
     updateRun();
@@ -545,6 +632,7 @@ async function boot() {
   }
   refreshUserBox();
 
+  document.addEventListener("paste", handlePaste);
   window.addEventListener("hashchange", router);
   router();
 }
