@@ -27,6 +27,12 @@ A complete tour of what ProofCheck does and why.
 - **Character-level diffs.** For every fuzzy/missing value you get a `[op, text]` diff
   (`equal`/`insert`/`delete`) showing exactly how the expected value differs from what was
   found, rendered as `<del>`/`<ins>` highlighting in the UI and reports.
+- **Duplicated-word detection.** A value that appears in the PDF but is immediately followed
+  by a repeat of its last word — a **duplicated surname**, e.g. the PDF showing `JORDAN AVERY
+  AVERY` for a spreadsheet value of `JORDAN AVERY` — is reported as **`FUZZY` / "Found with
+  differences"** with the extra word highlighted, rather than a clean `EXACT`. A plain
+  substring match would otherwise accept it silently, because the clean name is still a
+  perfect substring of the duplicated text. The check is deterministic and token-based.
 - **Pass rate** = `(exact + fuzzy) / (total − skipped)`; blank cells are excluded.
 - **Per-page location.** Each match reports the PDF page it was found on.
 
@@ -136,7 +142,7 @@ All normalization is deterministic and applied to both sides before comparison:
   JSON contract (`web/schemas.py`).
 - **Cross-OS setup scripts** (`scripts/setup.sh` / `setup.ps1`) install the Tesseract engine,
   create a virtualenv, install the package, and run the tests in one command.
-- **Deterministic test suite** (60 tests) with fixtures generated on the fly — no committed
+- **Deterministic test suite** (65 tests) with fixtures generated on the fly — no committed
   binaries. OCR tests pass with or without the engine installed.
 
 ---
@@ -417,7 +423,7 @@ Full per-file deep-dives live in [`proofcheckdocumentation/`](proofcheckdocument
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 60 tests
+pytest          # 65 tests
 ```
 
 OCR tests cover both the real graceful-degradation path and a monkeypatched recovery path,

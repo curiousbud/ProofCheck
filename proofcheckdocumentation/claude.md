@@ -205,7 +205,7 @@ the project's core contract.
 
 ### Current state (as of this guide)
 - Full core engine, CLI, web API + SPA, reports, and tests are implemented (v0.2.0).
-- **60 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
+- **65 tests pass.** Run: `pip install -e ".[dev]" && pytest`.
 - v0.2 added: **optional deterministic OCR** fallback (`ocr.py`) with a **content-addressed
   cache** (`ocr_cache.py`, never OCR an unchanged file twice), **diacritic folding**
   (`--fold-diacritics`), a **framework-free SPA** (`static/app.js`), **opt-in auth +
@@ -225,7 +225,7 @@ bash scripts/setup.sh                                  # Linux/macOS
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"                  # core + test deps (the dev extra includes OCR libs)
 # pip install -e ".[ocr]"                # OCR libs only; also needs the Tesseract *binary* on PATH
-pytest                                   # 60 tests
+pytest                                   # 65 tests
 proofcheck inspect file.xlsx             # list sheets/headers
 proofcheck check file.xlsx file.pdf -c "Name" --reverse --fold-diacritics --html out.html
 proofcheck check scan.xlsx scan.pdf -c "Name" --ocr --ocr-lang eng --ocr-dpi 300   # OCR scanned pages
@@ -253,6 +253,13 @@ PROOFCHECK_AUTH=on PROOFCHECK_ADMIN_USER=admin PROOFCHECK_ADMIN_PASSWORD=secret1
 - `pass_rate = (exact + fuzzy) / (total - skipped)`; skipped cells are excluded.
 - Diffs are emitted as `[op, text]` pairs (`equal|insert|delete|replace`); `replace` is
   decomposed into `delete`+`insert` so any client renders `<del>`/`<ins>` trivially.
+- **Duplicated surnames are not `EXACT`.** `matcher._adjacent_duplicate` catches a value
+  that appears in the PDF but is immediately followed by a repeat of its last word (e.g.
+  `JORDAN AVERY AVERY` for `JORDAN AVERY`) and routes it to `FUZZY` ("Found with
+  differences") with the extra word highlighted, instead of the plain-substring `EXACT`
+  shortcut. Deterministic + token-based; a clean verbatim occurrence anywhere still wins
+  as `EXACT`. Only a *trailing* duplicate reaches this path — an internal one already
+  breaks the substring and scores as ordinary `FUZZY`.
 - **OCR stays deterministic.** No-text-layer pages are warned + skipped by default. With
   `--ocr` (or the web checkbox) they are recovered via Tesseract — a fixed, offline glyph
   recogniser, NOT a learned/generative model — so same image + DPI → same text. If the OCR
