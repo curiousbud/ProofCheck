@@ -188,6 +188,14 @@ without reinstalling. It then shows up in the global list and runs from any dire
     $ python -m pip show proofcheck
     $ proofcheck --help          # works from anywhere now
 
+Cross-platform alternative (works in PowerShell/cmd too):
+
+```console
+$ python -m pip show proofcheck
+Name: proofcheck
+Location: ...
+```
+
 Remove it with `python -m pip uninstall proofcheck`. Drop the `-e` for a plain (copied)
 install if you don't want a live link to the source.
 
