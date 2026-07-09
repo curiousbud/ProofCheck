@@ -43,6 +43,34 @@ def test_threshold_is_respected():
     assert strict.status is Status.MISSING
 
 
+def test_duplicated_surname_is_flagged_not_exact():
+    # The PDF repeats the surname ("Jordan Avery Avery"). The clean spreadsheet
+    # value is still a perfect substring, but a duplicated surname must NOT pass as
+    # EXACT — it should surface as a difference with the extra word highlighted.
+    pages = {1: "JORDAN AVERY AVERY DEL-01"}
+    r = match_value("Jordan Avery", pages, fuzzy_threshold=90, row=1)
+    assert r.status is Status.FUZZY
+    assert r.page == 1
+    assert r.score < 100
+    # The diff keeps the expected name and flags the repeated surname as inserted.
+    inserted = "".join(t for op, t in r.diff if op == "insert")
+    assert "avery" in inserted.lower()
+
+
+def test_clean_match_still_exact_when_no_duplicate():
+    # A single, non-repeated occurrence stays EXACT even when other rows share a surname.
+    pages = {1: "MORGAN BLAKE ID-11", 2: "CASEY MORGAN BLAKE ID-20"}
+    assert match_value("Morgan Blake", pages, row=1).status is Status.EXACT
+    assert match_value("Casey Morgan Blake", pages, row=2).status is Status.EXACT
+
+
+def test_clean_occurrence_elsewhere_wins_over_duplicate():
+    # If the value appears cleanly on one page and duplicated on another, the clean
+    # verbatim occurrence takes priority (the value genuinely appears as written).
+    pages = {1: "RILEY QUINN QUINN AMD-01", 2: "RILEY QUINN MUM-09"}
+    assert match_value("Riley Quinn", pages, row=1).status is Status.EXACT
+
+
 def test_build_diff_pairs():
     diff = build_diff("gauttam", "gautam")
     ops = {op for op, _ in diff}

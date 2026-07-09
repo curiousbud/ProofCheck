@@ -42,6 +42,33 @@ def build_diff(expected: str, best_match: str) -> list[DiffOp]:
     return diff
 
 
+def _adjacent_duplicate(cand: str, hay: str) -> str | None:
+    """Detect a duplicated trailing word (e.g. a repeated surname) at a match site.
+
+    ``cand`` is a normalized needle that occurs verbatim in ``hay``. If the run of
+    words matching ``cand`` is *immediately followed* by one or more repeats of its
+    last word, return the normalized ``cand + repeated word(s)`` text (e.g.
+    ``"jordan avery avery"``); otherwise return ``None``.
+
+    This is what makes a duplicated surname visible: a plain substring test treats
+    ``"jordan avery"`` as found inside ``"jordan avery avery"`` and reports EXACT,
+    hiding the extra word. Token-based and deterministic — no scoring, no heuristics.
+    """
+    n = cand.split()
+    h = hay.split()
+    if not n:
+        return None
+    span = len(n)
+    for i in range(len(h) - span + 1):
+        if h[i:i + span] == n:
+            j = i + span
+            while j < len(h) and h[j] == n[-1]:
+                j += 1
+            if j > i + span:
+                return " ".join(h[i:j])
+    return None
+
+
 def _best_snippet(needle_norm: str, haystack_raw: str, haystack_norm: str) -> str:
     """Return the slice of the raw page text aligned to the best fuzzy match.
 
@@ -96,6 +123,8 @@ def match_value(
     best_score = -1.0
     best_snippet = ""
     exact_page: int | None = None
+    dup_page: int | None = None
+    dup_snippet = ""  # raw PDF text of the name INCLUDING the duplicated word
 
     for page_num, raw in pages.items():
         hay = normalize(raw, **norm_kwargs)
@@ -103,19 +132,38 @@ def match_value(
             continue
         for cand in needles:
             if cand and cand in hay:
-                # Exact substring hit — record the earliest page and stop refining.
-                if exact_page is None or page_num < exact_page:
-                    exact_page = page_num
+                dup = _adjacent_duplicate(cand, hay)
+                if dup is None:
+                    # Clean exact substring hit — record the earliest page.
+                    if exact_page is None or page_num < exact_page:
+                        exact_page = page_num
+                elif dup_page is None or page_num < dup_page:
+                    # Found, but the PDF repeats a trailing word (e.g. a duplicated
+                    # surname). Keep the raw snippet so the report shows the extra text.
+                    dup_page = page_num
+                    dup_snippet = _best_snippet(dup, raw, hay)
             score = fuzz.partial_ratio(cand, hay)
             if score > best_score:
                 best_score = score
                 best_page = page_num
                 best_snippet = _best_snippet(cand, raw, hay)
 
+    # A clean match anywhere wins: the value genuinely appears verbatim.
     if exact_page is not None:
         return MatchResult(
             row=row, expected=expected_str, status=Status.EXACT,
             page=exact_page, best_match=expected_str, score=100, diff=[],
+        )
+
+    # Otherwise, if the only match had a duplicated trailing word, surface it as a
+    # difference ("Found with differences") with a diff that highlights the extra word.
+    if dup_page is not None:
+        dup_norm = normalize(dup_snippet, **norm_kwargs)
+        return MatchResult(
+            row=row, expected=expected_str, status=Status.FUZZY,
+            page=dup_page, best_match=dup_snippet or None,
+            score=int(round(fuzz.ratio(needle, dup_norm))),
+            diff=build_diff(needle, dup_norm),
         )
 
     score_int = int(round(best_score)) if best_score >= 0 else 0
