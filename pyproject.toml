@@ -35,7 +35,9 @@ ocr = [
 ]
 dev = [
     "pytest==9.1.1",
-    "httpx==0.28.1",
+    # starlette's TestClient (used by fastapi.testclient) now targets httpx2;
+    # pairing it with the legacy httpx raises a StarletteDeprecationWarning.
+    "httpx2==2.5.0",
     "reportlab==5.0.0",
     "pytesseract==0.3.13",
     "Pillow>=10,<13",

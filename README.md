@@ -174,6 +174,53 @@ pip install -e ".[ocr]"     # + OCR helpers (also needs the Tesseract *binary*, 
 
 This installs the `proofcheck` console script.
 
+### Global install (use `proofcheck` anywhere, no virtualenv to activate)
+
+If you just want the `proofcheck` command available system-wide — no `source .venv/...`
+step before every run — install it into your global Python instead of a project venv.
+
+**Editable global install (recommended for a working clone).** Run this from the repo root
+with the interpreter you want it attached to:
+
+```bash
+# 'python' here is your GLOBAL interpreter, NOT an activated venv
+python -m pip install -e .            # core only
+python -m pip install -e ".[ocr]"     # + OCR helpers (still needs the Tesseract binary)
+```
+
+`-e` (editable) links the install straight to this source tree, so `git pull`s take effect
+without reinstalling. It then shows up in the global list and runs from any directory:
+
+    $ python -m pip show proofcheck
+    $ proofcheck --help          # works from anywhere now
+
+Cross-platform alternative (works in PowerShell/cmd too):
+
+```console
+$ python -m pip show proofcheck
+Name: proofcheck
+Location: ...
+```
+
+Remove it with `python -m pip uninstall proofcheck`. Drop the `-e` for a plain (copied)
+install if you don't want a live link to the source.
+
+**Alternatives:**
+
+- **[`pipx`](https://pipx.pypa.io/)** — isolates the CLI in its own hidden venv so its
+  dependencies never clash with your other global packages (cleanest if you only want the
+  command, not an importable library):
+  ```bash
+  pipx install .                 # or ".[ocr]", or git+https://github.com/curiousbud/ProofCheck.git
+  ```
+- **User install** — same as the editable install but into your per-user site-packages
+  (no admin needed on locked-down machines): `python -m pip install --user .`
+
+> On Windows, if the shell can't find `proofcheck` afterwards, your Python `Scripts`
+> directory isn't on `PATH` — add `%APPDATA%\Python\Python3xx\Scripts` (`--user`) or run
+> `python -m pipx ensurepath` (pipx), then reopen the terminal. The Tesseract **engine
+> binary** is still a separate system install (see below) if you need `--ocr`.
+
 #### Installing the Tesseract engine (only needed for `--ocr`)
 
 `pip install ".[ocr]"` adds the Python helpers; the **engine binary** is a separate
@@ -184,8 +231,16 @@ system install:
 | Debian/Ubuntu | `sudo apt-get install -y tesseract-ocr` |
 | Fedora | `sudo dnf install -y tesseract` |
 | Arch | `sudo pacman -S tesseract` |
-| macOS | `brew install tesseract` |
-| Windows | `winget install UB-Mannheim.TesseractOCR` |
+| openSUSE | `sudo zypper install -y tesseract-ocr` |
+| Alpine | `sudo apk add tesseract-ocr` |
+| Void | `sudo xbps-install -Sy tesseract-ocr` |
+| Solus | `sudo eopkg install -y tesseract` |
+| Nix | `nix-env -iA nixpkgs.tesseract` |
+| macOS | `brew install tesseract` (or `sudo port install tesseract`) |
+| Windows | `winget install UB-Mannheim.TesseractOCR` (or `choco`/`scoop`) |
+
+The `scripts/setup.*` helpers try these automatically, in order, and fall back to a direct
+UB-Mannheim installer download on Windows if no package manager is present.
 
 ProofCheck auto-discovers the engine on PATH and at the standard Windows location
 (`C:\Program Files\Tesseract-OCR`). Override with `TESSERACT_CMD=/path/to/tesseract`.

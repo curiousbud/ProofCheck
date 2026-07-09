@@ -43,12 +43,16 @@ install_tesseract() {
       elif command -v pacman  >/dev/null 2>&1; then sudo pacman -Sy --noconfirm tesseract
       elif command -v zypper  >/dev/null 2>&1; then sudo zypper install -y tesseract-ocr
       elif command -v apk     >/dev/null 2>&1; then sudo apk add tesseract-ocr
+      elif command -v xbps-install >/dev/null 2>&1; then sudo xbps-install -Sy tesseract-ocr   # Void
+      elif command -v eopkg   >/dev/null 2>&1; then sudo eopkg install -y tesseract            # Solus
+      elif command -v nix-env >/dev/null 2>&1; then nix-env -iA nixpkgs.tesseract              # Nix (no sudo)
       else warn "No known package manager found. Install 'tesseract-ocr' manually."
       fi
       ;;
     Darwin)
-      if command -v brew >/dev/null 2>&1; then brew install tesseract
-      else warn "Homebrew not found. Install it from https://brew.sh then run 'brew install tesseract'."
+      if   command -v brew >/dev/null 2>&1; then brew install tesseract
+      elif command -v port >/dev/null 2>&1; then sudo port install tesseract                   # MacPorts
+      else warn "Neither Homebrew nor MacPorts found. Install Homebrew from https://brew.sh then 'brew install tesseract'."
       fi
       ;;
     *)
