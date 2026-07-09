@@ -65,6 +65,29 @@ Computes a **character-level** diff (the `SequenceMatcher` operates over the str
 - **`insert`** → text exists in the match but not `expected` → `("insert", best_match[b1:b2])`.
 - **`replace`** → a span differs on both sides. Rather than emit a `replace` op, it is **split into a `delete` of the expected span followed by an `insert` of the match span**. This lets any frontend render `<del>`/`<ins>` markup uniformly without special-casing a `replace` op. (`DiffOp` is the tuple type `(op, text)` defined in `models.py`; `replace` is reserved but never produced here.)
 
+### `_adjacent_duplicate`
+
+```python
+def _adjacent_duplicate(cand: str, hay: str) -> str | None:
+    n = cand.split()
+    h = hay.split()
+    if not n:
+        return None
+    span = len(n)
+    for i in range(len(h) - span + 1):
+        if h[i:i + span] == n:
+            j = i + span
+            while j < len(h) and h[j] == n[-1]:
+                j += 1
+            if j > i + span:
+                return " ".join(h[i:j])
+    return None
+```
+
+Detects a **duplicated trailing word** — typically a repeated surname — at a match site. `cand` is a normalized needle already known to occur in the normalized haystack `hay`. Both are split into word tokens; the function finds the run of `hay` tokens equal to `cand`, then walks forward while the following token keeps repeating `cand`'s **last** word. If at least one such repeat exists it returns the normalized `cand + repeated word(s)` string (e.g. `"jordan avery avery"`), otherwise `None`.
+
+This is what makes a duplicated surname visible. A plain substring test treats `"jordan avery"` as found inside `"jordan avery avery"` and returns `EXACT`, silently accepting the extra word; `partial_ratio` doesn't help either because it scores by the *best-matching substring*, so trailing/duplicated text never lowers the score. Because an exact substring hit means `cand` appears contiguously, the only way a duplicate survives into this path is as a **trailing** repeat of the last word — an *internal* duplicate would break the contiguous match and already be scored as `FUZZY`. Token-based and fully deterministic — no scoring, no heuristics.
+
 ### `_best_snippet`
 
 ```python
@@ -134,6 +157,8 @@ The expected value is normalized once. If `reverse` is on, a word-order-swapped 
     best_score = -1.0
     best_snippet = ""
     exact_page: int | None = None
+    dup_page: int | None = None
+    dup_snippet = ""  # raw PDF text of the name INCLUDING the duplicated word
 
     for page_num, raw in pages.items():
         hay = normalize(raw, **norm_kwargs)
@@ -141,8 +166,13 @@ The expected value is normalized once. If `reverse` is on, a word-order-swapped 
             continue
         for cand in needles:
             if cand and cand in hay:
-                if exact_page is None or page_num < exact_page:
-                    exact_page = page_num
+                dup = _adjacent_duplicate(cand, hay)
+                if dup is None:
+                    if exact_page is None or page_num < exact_page:
+                        exact_page = page_num
+                elif dup_page is None or page_num < dup_page:
+                    dup_page = page_num
+                    dup_snippet = _best_snippet(dup, raw, hay)
             score = fuzz.partial_ratio(cand, hay)
             if score > best_score:
                 best_score = score
@@ -150,12 +180,12 @@ The expected value is normalized once. If `reverse` is on, a word-order-swapped 
                 best_snippet = _best_snippet(cand, raw, hay)
 ```
 Each page's raw text is normalized to `hay` (empty pages skipped). For every candidate needle:
-- **Exact substring test** (`cand in hay`): if the normalized needle is a literal substring of the normalized page, record the page as an exact hit. Among multiple exact hits, the **earliest page** is kept (`page_num < exact_page`).
+- **Exact substring test** (`cand in hay`): if the normalized needle is a literal substring of the normalized page, check it for a duplicated trailing word via `_adjacent_duplicate`. A **clean** hit records the page as an exact hit (earliest page kept). A hit **with a duplicated surname** instead records `dup_page` and the raw snippet that *includes* the extra word (`_best_snippet(dup, …)`), so it can later be surfaced as a difference rather than a clean match.
 - **Fuzzy score**: `fuzz.partial_ratio(cand, hay)` gives a 0–100 score for the best substring-like alignment. The global best score, its page, and the recovered raw snippet (`_best_snippet`) are tracked. Note both candidates compete for the single best score across all pages.
 
 `best_score` starts at `-1.0` so any real score (≥0) wins on the first comparison.
 
-**4. Exact match wins outright.**
+**4. A clean exact match wins outright.**
 ```python
     if exact_page is not None:
         return MatchResult(
@@ -163,7 +193,20 @@ Each page's raw text is normalized to `hay` (empty pages skipped). For every can
             page=exact_page, best_match=expected_str, score=100, diff=[],
         )
 ```
-If any page contained the needle verbatim (post-normalization), return `EXACT` immediately: score is forced to `100`, `best_match` is the expected text itself, and the diff is empty (nothing differs). This takes precedence over fuzzy scoring even if some other page had a numerically higher partial score.
+If any page contained the needle verbatim (post-normalization) **without** a duplicated trailing word, return `EXACT` immediately: score is forced to `100`, `best_match` is the expected text itself, and the diff is empty. A clean occurrence anywhere takes priority — the value genuinely appears as written — even over a page that duplicates it and over a numerically higher partial score elsewhere.
+
+**4b. A duplicated surname is surfaced as a difference.**
+```python
+    if dup_page is not None:
+        dup_norm = normalize(dup_snippet, **norm_kwargs)
+        return MatchResult(
+            row=row, expected=expected_str, status=Status.FUZZY,
+            page=dup_page, best_match=dup_snippet or None,
+            score=int(round(fuzz.ratio(needle, dup_norm))),
+            diff=build_diff(needle, dup_norm),
+        )
+```
+If the value was only ever found immediately followed by a repeat of its last word, it is reported as `FUZZY` ("Found with differences") instead of `EXACT`. `best_match` is the raw PDF snippet **including** the duplicated word, the diff (`needle` vs the normalized duplicated snippet) highlights the extra word as an `insert`, and the score is `fuzz.ratio` of the expected value against the duplicated text (so it honestly reflects the extra token, e.g. ~75–80 rather than 100). This branch is reached before the generic fuzzy/missing classification below.
 
 **5. Otherwise classify by fuzzy threshold and build the diff.**
 ```python
@@ -188,6 +231,7 @@ The float best score is rounded to an int (or `0` if no page produced a score). 
 | --- | --- | --- | --- |
 | `_is_blank` | `_is_blank(value: object) -> bool` | `bool` | True for `None` or whitespace-only values; routes cells to `SKIPPED`. |
 | `build_diff` | `build_diff(expected: str, best_match: str) -> list[DiffOp]` | `list[DiffOp]` | Character-level diff (`equal`/`delete`/`insert`); decomposes `replace` into delete+insert. |
+| `_adjacent_duplicate` | `_adjacent_duplicate(cand: str, hay: str) -> str \| None` | `str \| None` | Token-based detector for a duplicated trailing word (repeated surname) at a match site; returns the `cand + repeat(s)` text or `None`. |
 | `_best_snippet` | `_best_snippet(needle_norm: str, haystack_raw: str, haystack_norm: str) -> str` | `str` | Maps the fuzzy alignment indices from normalized space back onto raw page text to slice a readable snippet. |
 | `match_value` | `match_value(expected, pages, *, fuzzy_threshold=90, normalize_digits=False, strip_punctuation=False, reverse=False, row=0) -> MatchResult` | `MatchResult` | Classifies one expected value vs all PDF pages and returns the full per-cell result. |
 
@@ -197,7 +241,9 @@ The float best score is rounded to an int (or `0` if no page produced a score). 
 | --- | --- |
 | `needle` | Normalized form of the expected value being searched for. |
 | `needles` | Candidate forms to try (the needle, plus a reversed-word-order variant when `reverse=True`). |
-| `exact_page` | Earliest page number containing the needle as a literal substring; drives `EXACT`. |
+| `exact_page` | Earliest page number containing the needle as a **clean** literal substring (no duplicated trailing word); drives `EXACT`. |
+| `dup_page` | Earliest page where the needle is found but immediately followed by a repeat of its last word; drives the duplicated-surname `FUZZY` result. |
+| `dup_snippet` | Raw PDF text of the matched name **including** the duplicated word; becomes `best_match` for the duplicated-surname case. |
 | `best_page` | Page with the highest fuzzy `partial_ratio`. |
 | `best_score` | Highest fuzzy score seen (initialized to `-1.0` so any real score wins). |
 | `best_snippet` | Raw-text snippet aligned to the best fuzzy match; becomes `best_match`. |
@@ -207,7 +253,8 @@ The float best score is rounded to an int (or `0` if no page produced a score). 
 
 ## Notes / gotchas
 - **Determinism:** No AI/ML. `rapidfuzz` scoring and `difflib` are deterministic pure functions; the same Excel value + PDF text always yields the same `MatchResult`. `SequenceMatcher(..., autojunk=False)` avoids difflib's nondeterministic-feeling junk heuristic.
-- **Exact beats fuzzy:** A verbatim substring hit returns `EXACT` (score 100, empty diff) regardless of any higher fuzzy score elsewhere; the earliest such page wins.
+- **Exact beats fuzzy:** A *clean* verbatim substring hit returns `EXACT` (score 100, empty diff) regardless of any higher fuzzy score elsewhere; the earliest such page wins.
+- **Duplicated surname ≠ exact:** if the needle is found only where the PDF immediately repeats its last word (e.g. `JORDAN AVERY AVERY` for `JORDAN AVERY`), the result is `FUZZY` ("Found with differences") with the extra word highlighted, not a clean `EXACT`. A plain `cand in hay` test would otherwise hide it, since the clean name is still a perfect substring. A clean occurrence on any page still wins as `EXACT`. Only a *trailing* duplicate reaches this path — an internal duplicate breaks the contiguous substring and is scored as ordinary `FUZZY`.
 - **Threshold semantics:** `score_int >= fuzzy_threshold` → `FUZZY`; otherwise `MISSING`. The comparison is on the rounded integer score, so the boundary is inclusive (default 90).
 - **`replace` decomposition:** `build_diff` never emits a `replace` op — replacements are split into a `delete` of the expected span plus an `insert` of the match span so frontends render `<del>`/`<ins>` uniformly.
 - **Alignment → snippet is approximate:** `_best_snippet` proportionally rescales normalized indices onto raw text; when normalization changes length the snippet bounds are an approximation, with a fallback to the normalized slice if the raw slice is empty.

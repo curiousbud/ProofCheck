@@ -18,6 +18,7 @@ HTML / xlsx reports plus a swappable web UI.
 - [x] `ocr_cache.py` — **content-addressed OCR cache** (sha256 of file + dpi + lang); unchanged file = cache hit (no re-OCR), changed file = fresh OCR
 - [x] `humanize.py` — **plain-language wording** for reports (Found / Found-with-differences / Not-found / Blank); presentation only
 - [x] `matcher.py` — exact / fuzzy / missing / skipped matching + `[op,text]` diff (difflib)
+- [x] `matcher.py` — **duplicated-word detection**: a value found in the PDF but immediately followed by a repeat of its last word (a **duplicated surname**, e.g. PDF `JORDAN AVERY AVERY` for `JORDAN AVERY`) is flagged as **`FUZZY` / "Found with differences"** with the extra word highlighted, instead of passing as a clean `EXACT`; deterministic + token-based, a clean verbatim occurrence still wins as `EXACT`
 - [x] `pipeline.py` — **shared orchestration** `run(RunConfig) -> RunResult` (CLI + web call this, no duplication)
 
 ## Reports (human-readable for non-technical readers)
