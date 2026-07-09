@@ -185,11 +185,8 @@ python -m pip install -e ".[ocr]"     # + OCR helpers (still needs the Tesseract
 `-e` (editable) links the install straight to this source tree, so `git pull`s take effect
 without reinstalling. It then shows up in the global list and runs from any directory:
 
-```console
-$ python -m pip list | grep proofcheck
-proofcheck   0.2.0   C:\Users\you\...\ProofCheck
-$ proofcheck --help          # works from anywhere now
-```
+    $ python -m pip show proofcheck
+    $ proofcheck --help          # works from anywhere now
 
 Remove it with `python -m pip uninstall proofcheck`. Drop the `-e` for a plain (copied)
 install if you don't want a live link to the source.
