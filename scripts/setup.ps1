@@ -40,13 +40,20 @@ function Install-TesseractFromInstaller {
         Info "Downloading the Tesseract installer from UB-Mannheim..."
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri $url -OutFile $exe -UseBasicParsing
+
+        $sig = Get-AuthenticodeSignature -FilePath $exe
+        if ($sig.Status -ne 'Valid') { throw "Installer signature is not valid ($($sig.Status))." }
+
         Info "Running the installer silently (this may take a minute)..."
-        Start-Process -FilePath $exe -ArgumentList "/S" -Wait
-        Remove-Item $exe -ErrorAction SilentlyContinue
+        $p = Start-Process -FilePath $exe -ArgumentList "/S" -Wait -PassThru
+        if ($p.ExitCode -ne 0) { throw "Installer exited with code $($p.ExitCode)." }
+
         return (Test-Path "$TessDir\tesseract.exe")
     } catch {
         Warn "Installer download/run failed: $($_.Exception.Message)"
         return $false
+    } finally {
+        Remove-Item $exe -ErrorAction SilentlyContinue
     }
 }
 
