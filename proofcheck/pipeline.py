@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 
 from . import document, excel, pdf
+from .concurrency import ordered_map, resolve_workers
 from .matcher import match_value, normalize_pages
 from .models import (
     ColumnResult,
@@ -65,6 +66,7 @@ def run(config: RunConfig) -> RunResult:
         raise PipelineError("No columns to check were found on the sheet.")
 
     # 2. Extract page text from the input (PDF text layer, or OCR for image input).
+    # OCR (the slow path) fans its per-page work out over ``config.workers``.
     try:
         pdf_text = document.extract(
             config.pdf_path,
@@ -73,14 +75,19 @@ def run(config: RunConfig) -> RunResult:
             ocr_lang=config.ocr_lang,
             ocr_psm=config.ocr_psm,
             use_cache=config.ocr_cache,
+            workers=config.workers,
         )
     except pdf.PdfError as exc:
         raise PipelineError(str(exc)) from exc
 
     # 3. Match every value in every selected column.
     # Pages recovered via OCR, so each match can report whether it came from the embedded
-    # text layer or from OCR.
+    # text layer or from OCR. Every value is an independent, pure match against the same
+    # pages, so the work fans out over a thread pool (rapidfuzz releases the GIL) and the
+    # results are reassembled in the original column/row order — output is identical to the
+    # sequential path regardless of ``config.workers``.
     ocr_page_set = set(pdf_text.ocr_pages)
+
     # Normalize each page's text ONCE for the whole run. The normalization depends only on
     # the run-wide flags, so it is identical for every value; doing it here instead of inside
     # match_value turns an O(values x pages) pass over the full PDF text into an O(pages) one.
@@ -90,25 +97,38 @@ def run(config: RunConfig) -> RunResult:
         strip_punctuation=config.strip_punctuation,
         fold_diacritics=config.fold_diacritics,
     )
-    columns: list[ColumnResult] = []
-    for cd in column_data:
-        col_result = ColumnResult(name=cd.name)
-        for row_num, value in cd.cells:
-            mr = match_value(
-                value,
-                pdf_text.pages,
-                fuzzy_threshold=config.fuzzy_threshold,
-                normalize_digits=config.normalize_digits,
-                strip_punctuation=config.strip_punctuation,
-                fold_diacritics=config.fold_diacritics,
-                reverse=config.reverse,
-                row=row_num,
-                pages_norm=pages_norm,
-            )
-            if mr.page is not None:
-                mr.source = "OCR" if mr.page in ocr_page_set else "text"
-            col_result.results.append(mr)
-        columns.append(col_result)
+
+    # Flatten to (column_index, row, value) tasks so results can be reassembled by position.
+    # Every value is an independent, pure match against the same pages, so the work fans out
+    # over a thread pool (rapidfuzz releases the GIL) and is reassembled in the original
+    # column/row order — output is identical regardless of ``config.workers``.
+    tasks = [
+        (col_idx, row_num, value)
+        for col_idx, cd in enumerate(column_data)
+        for row_num, value in cd.cells
+    ]
+
+    def _match_task(task: tuple[int, int, object]):
+        col_idx, row_num, value = task
+        mr = match_value(
+            value,
+            pdf_text.pages,
+            fuzzy_threshold=config.fuzzy_threshold,
+            normalize_digits=config.normalize_digits,
+            strip_punctuation=config.strip_punctuation,
+            fold_diacritics=config.fold_diacritics,
+            reverse=config.reverse,
+            row=row_num,
+            pages_norm=pages_norm,
+        )
+        if mr.page is not None:
+            mr.source = "OCR" if mr.page in ocr_page_set else "text"
+        return col_idx, mr
+
+    workers = resolve_workers(config.workers, len(tasks))
+    columns = [ColumnResult(name=cd.name) for cd in column_data]
+    for col_idx, mr in ordered_map(_match_task, tasks, workers=workers):
+        columns[col_idx].results.append(mr)
 
     # 4. Assemble the result.
     summary = _summarize(columns)

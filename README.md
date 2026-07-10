@@ -75,6 +75,10 @@ All normalization is deterministic and applied to both sides before comparison:
   (no OCR). Each page tries a few deterministic strategies but **early-exits** as soon as it
   gets a confident read, so clean pages cost a single Tesseract pass. For big multi-page PDFs,
   a lower `--ocr-dpi` is the most effective speed knob.
+- **Parallelism.** `--workers/-j` (default `0` = auto from CPU count; `1` = sequential) fans the
+  independent per-page OCR and per-value matching out over a thread pool. It only changes *how
+  fast* a run finishes, never the result: work is reassembled in input order and every unit is a
+  pure function of its input, so output is byte-for-byte identical to `-j 1`.
 - **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text, **mean confidence**,
   and the winning **strategy** per page; `--save-images DIR` dumps exactly what Tesseract saw.
 - **Limits.** Tesseract is trained on ordinary document fonts. Heavily stylized **display /
@@ -302,6 +306,9 @@ Tune accuracy with `--ocr-dpi` (raise for small text) and `--ocr-psm` (page layo
 **OCR flags:** `--ocr` (OCR pages with no text layer), `--ocr-lang` (Tesseract language(s),
 e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300), `--ocr-psm` (page layout),
 `--no-ocr-cache` (force fresh OCR, ignore the cache for this run).
+
+**Performance flags:** `--workers/-j N` (parallel workers for OCR and matching; `0` = auto
+from CPU count, `1` = sequential). Output is identical regardless of the worker count.
 
 ### Status meanings & colors
 

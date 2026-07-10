@@ -130,6 +130,7 @@ def extract(
     ocr_lang: str = "eng",
     ocr_psm: int = 6,
     use_cache: bool = True,
+    workers: int = 0,
 ) -> PdfText:
     """Extract text from every page of the PDF at ``path``.
 
@@ -137,7 +138,8 @@ def extract(
     PDFium isn't available or is explicitly disabled via ``PROOFCHECK_PDF_ENGINE=pdfplumber``.
     With ``ocr=True``, pages that have no embedded text layer are OCR'd as a fallback (when the
     optional OCR support is installed); otherwise they are reported as empty. ``use_cache=False``
-    forces a fresh OCR even if a cached result exists.
+    forces a fresh OCR even if a cached result exists. ``workers`` controls how many pages are
+    OCR'd in parallel (0 = auto, 1 = sequential).
     """
     engine = _resolve_engine()
     try:
@@ -162,13 +164,14 @@ def extract(
             result.empty_pages.append(i)
 
     if ocr and result.empty_pages:
-        _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm, use_cache=use_cache)
+        _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm,
+                   use_cache=use_cache, workers=workers)
 
     return result
 
 
 def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
-               use_cache: bool = True) -> None:
+               use_cache: bool = True, workers: int = 0) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
 
     Uses the content-addressed OCR cache first: an identical file (same bytes, dpi, lang)
@@ -191,7 +194,8 @@ def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
             result.ocr_unavailable_reason = ocr_mod.unavailable_reason()
             return
         try:
-            recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang, psm=psm)
+            recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang,
+                                          psm=psm, workers=workers)
         except ocr_mod.OcrError as exc:
             result.ocr_error = str(exc)
             return

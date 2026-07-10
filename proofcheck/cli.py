@@ -67,6 +67,8 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
 @click.option("--ocr-psm", default=6, show_default=True, type=click.IntRange(0, 13),
               help="Tesseract page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--no-ocr-cache", is_flag=True, help="Force fresh OCR (ignore the OCR cache).")
+@click.option("--workers", "-j", default=0, show_default=True, type=click.IntRange(0, 64),
+              help="Parallel workers for OCR and matching (0 = auto, 1 = sequential).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
 @click.option("--xlsx", "xlsx_out", type=click.Path(dir_okay=False), help="Write an xlsx report here.")
 def check(
@@ -86,6 +88,7 @@ def check(
     ocr_lang: str,
     ocr_psm: int,
     no_ocr_cache: bool,
+    workers: int,
     html_out: str | None,
     xlsx_out: str | None,
 ) -> None:
@@ -107,6 +110,7 @@ def check(
         ocr_lang=ocr_lang,
         ocr_psm=ocr_psm,
         ocr_cache=not no_ocr_cache,
+        workers=workers,
     )
     try:
         result = pipeline_run(config)
