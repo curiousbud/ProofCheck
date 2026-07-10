@@ -123,6 +123,61 @@ const api = {
   deleteHistory: (id) => api.json("DELETE", `/api/history/${id}`),
 };
 
+// Stream a check as Server-Sent Events, invoking onEvent for each parsed frame
+// ({type:"progress"|"result"|"error", ...}). Falls back to throwing on a non-OK response
+// so the caller can show the same error banner as the plain /api/check path.
+async function streamCheck(formData, onEvent) {
+  const res = await fetch("/api/check/stream", {
+    method: "POST", body: formData, credentials: "same-origin",
+  });
+  if (!res.ok || !res.body) {
+    let data = null;
+    try { data = await res.json(); } catch (_) { /* empty */ }
+    const e = new Error((data && (data.error || data.detail)) || res.statusText);
+    e.status = res.status;
+    throw e;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line; each frame's payload is its `data:` line.
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) >= 0) {
+      const frame = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
+      if (!dataLine) continue;
+      let evt;
+      try { evt = JSON.parse(dataLine.slice(5).trim()); } catch (_) { continue; }
+      onEvent(evt);
+    }
+  }
+}
+
+// A small progress bar with a per-stage label and a definite completion tick.
+function progressUI() {
+  const LABELS = { extract: "Reading the PDF", match: "Checking values" };
+  const label = el("div", { class: "pbar-label" }, "Starting…");
+  const fill = el("div", { class: "pbar-fill" });
+  const track = el("div", { class: "pbar-track" }, fill);
+  const node = el("div", { class: "pbar" }, label, track);
+  return {
+    node,
+    update(stage, current, total) {
+      const pct = total > 0 ? Math.round((current * 100) / total) : 0;
+      fill.style.width = pct + "%";
+      const name = LABELS[stage] || stage;
+      const doneTick = current >= total && total > 0 ? " ✓" : "";
+      label.textContent = `${name}: ${current} / ${total} (${pct}%)${doneTick}`;
+    },
+    remove() { node.remove(); },
+  };
+}
+
 // ---- app state --------------------------------------------------------------
 const state = { health: null, user: null, inspectData: null, lastResult: null };
 
@@ -319,10 +374,22 @@ function wireCheck() {
 
     const btn = $("run");
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Running…';
+    const prog = progressUI();
+    $("msgs").innerHTML = "";
+    $("msgs").appendChild(prog.node);
     try {
-      state.lastResult = await api.form("/api/check", fd);
-      renderResults(state.lastResult);
+      let result = null;
+      let streamError = null;
+      await streamCheck(fd, (evt) => {
+        if (evt.type === "progress") prog.update(evt.stage, evt.current, evt.total);
+        else if (evt.type === "result") result = evt.data;
+        else if (evt.type === "error") streamError = evt.error;
+      });
+      prog.remove();
+      if (streamError) throw new Error(streamError);
+      if (result) { state.lastResult = result; renderResults(result); }
     } catch (e) {
+      prog.remove();
       if (e.status === 401) return redirectLogin();
       $("msgs").appendChild(banner("err", "Check failed: " + esc(e.message)));
     } finally {
