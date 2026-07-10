@@ -56,6 +56,25 @@ def test_all_columns(excel_path, pdf_path):
     assert {c.name for c in result.columns} == {"Name", "CC Code", "City"}
 
 
+@pytest.mark.parametrize("workers", [1, 2, 4, 8])
+def test_workers_do_not_change_output(excel_path, pdf_path, workers):
+    """Parallelism must be transparent: any worker count yields identical results."""
+    base = run(RunConfig(
+        excel_path=excel_path, pdf_path=pdf_path,
+        all_columns=True, sheet="Delegates", reverse=True, workers=1,
+    ))
+    parallel = run(RunConfig(
+        excel_path=excel_path, pdf_path=pdf_path,
+        all_columns=True, sheet="Delegates", reverse=True, workers=workers,
+    ))
+    # Same columns, in the same order, with the same per-row results (order included).
+    assert [c.name for c in parallel.columns] == [c.name for c in base.columns]
+    for pc, bc in zip(parallel.columns, base.columns):
+        assert [(r.row, r.expected, r.status, r.page, r.score) for r in pc.results] == \
+               [(r.row, r.expected, r.status, r.page, r.score) for r in bc.results]
+    assert parallel.summary == base.summary
+
+
 def test_no_columns_raises(excel_path, pdf_path):
     with pytest.raises(PipelineError):
         run(RunConfig(excel_path=excel_path, pdf_path=pdf_path, sheet="Delegates"))
