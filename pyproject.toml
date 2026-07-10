@@ -15,6 +15,8 @@ license = { text = "See LICENSE.md for proprietary terms" }
 dependencies = [
     "click==8.4.1",
     "openpyxl==3.1.5",
+    # PDFium is the primary, fast text-extraction engine; pdfplumber is the fallback.
+    "pypdfium2>=4,<6",
     "pdfplumber==0.11.10",
     "rapidfuzz==3.14.5",
     "fastapi==0.138.0",
@@ -31,7 +33,7 @@ dependencies = [
 ocr = [
     "pytesseract==0.3.13",
     "Pillow>=10,<13",
-    "pypdfium2>=4,<6",
+    # pypdfium2 (the page renderer OCR needs) is a core dependency now — see [project].
 ]
 dev = [
     "pytest==9.1.1",
@@ -41,7 +43,6 @@ dev = [
     "reportlab==5.0.0",
     "pytesseract==0.3.13",
     "Pillow>=10,<13",
-    "pypdfium2>=4,<6",
 ]
 
 [project.scripts]
