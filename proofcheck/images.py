@@ -13,6 +13,7 @@ images that are new or changed.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from .pdf import PdfText
 
@@ -49,13 +50,15 @@ def list_images(path: str) -> list[str]:
 
 
 def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
-            use_cache: bool = True, workers: int = 0) -> PdfText:
+            use_cache: bool = True, workers: int = 0,
+            progress: Callable[[int, int], None] | None = None) -> PdfText:
     """Build a :class:`PdfText` by OCR'ing the image(s) at ``path`` (file or directory).
 
-    ``use_cache=False`` forces a fresh OCR of every image even if cached. ``workers``
-    controls how many images are OCR'd in parallel (0 = auto, 1 = sequential); each image is
-    an independent page, so results are reassembled in filename order and are identical to
-    the sequential path.
+    ``use_cache=False`` forces a fresh OCR of every image even if cached. ``workers`` controls
+    how many images are OCR'd in parallel (0 = auto, 1 = sequential); each image is an
+    independent page, so results are reassembled in filename order and are identical to the
+    sequential path. ``progress`` is an optional ``(done, total)`` observer called as each image
+    is processed.
     """
     from . import ocr as ocr_mod, ocr_cache
     from .concurrency import ordered_map, resolve_workers
@@ -97,9 +100,11 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
         return i, text, False, error
 
     items = list(enumerate(files, start=1))
-    n_workers = resolve_workers(workers, len(items))
+    total = len(items)
+    n_workers = resolve_workers(workers, total)
 
     all_cached = True
+    done = 0
     for i, text, from_cache, error in ordered_map(_process, items, workers=n_workers):
         if error is not None:
             result.ocr_error = error
@@ -110,6 +115,9 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
             result.ocr_pages.append(i)
         else:
             result.empty_pages.append(i)
+        done += 1
+        if progress:
+            progress(done, total)
 
     result.ocr_from_cache = all_cached and bool(result.ocr_pages)
     return result

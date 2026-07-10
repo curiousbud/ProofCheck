@@ -9,6 +9,8 @@ door open for a future background-job runner (arq/RQ) to call it unchanged.
 from __future__ import annotations
 
 import os
+import threading
+from collections.abc import Callable
 
 from . import document, excel, pdf
 from .concurrency import ordered_map, resolve_workers
@@ -21,6 +23,13 @@ from .models import (
     Status,
     Summary,
 )
+
+# Progress callback: ``progress(stage, current, total)`` where ``stage`` is "extract"
+# (reading the PDF text layer + any OCR of no-text-layer pages) or "match" (checking values),
+# and ``current``/``total`` are unit counts. It is called with ``current == total`` when a
+# stage finishes, so a renderer can show a definite 100%/done state. Purely observational — it
+# never affects the result, so a run with no callback behaves exactly as before.
+ProgressFn = Callable[[str, int, int], None]
 
 
 class PipelineError(Exception):
@@ -45,8 +54,13 @@ def _summarize(columns: list[ColumnResult]) -> Summary:
     return summary
 
 
-def run(config: RunConfig) -> RunResult:
-    """Execute one check run and return a fully-assembled :class:`RunResult`."""
+def run(config: RunConfig, *, progress: ProgressFn | None = None) -> RunResult:
+    """Execute one check run and return a fully-assembled :class:`RunResult`.
+
+    ``progress`` is an optional observer (see :data:`ProgressFn`) notified as the extraction
+    and matching stages advance, so a caller (e.g. the CLI or the web stream) can render a
+    progress bar. It has no effect on the result.
+    """
     if not config.all_columns and not config.columns:
         raise PipelineError("No columns selected. Pass column names or enable all-columns.")
 
@@ -66,7 +80,10 @@ def run(config: RunConfig) -> RunResult:
         raise PipelineError("No columns to check were found on the sheet.")
 
     # 2. Extract page text from the input (PDF text layer, or OCR for image input).
-    # OCR (the slow path) fans its per-page work out over ``config.workers``.
+    # Extraction (text layer + any OCR) is the slow stage on large/scanned PDFs, so it reports
+    # per-page progress under the "extract" stage; OCR of no-text-layer pages fans out over
+    # ``config.workers``.
+    ocr_progress = (lambda done, total: progress("extract", done, total)) if progress else None
     try:
         pdf_text = document.extract(
             config.pdf_path,
@@ -76,16 +93,12 @@ def run(config: RunConfig) -> RunResult:
             ocr_psm=config.ocr_psm,
             use_cache=config.ocr_cache,
             workers=config.workers,
+            progress=ocr_progress,
         )
     except pdf.PdfError as exc:
         raise PipelineError(str(exc)) from exc
 
     # 3. Match every value in every selected column.
-    # Pages recovered via OCR, so each match can report whether it came from the embedded
-    # text layer or from OCR. Every value is an independent, pure match against the same
-    # pages, so the work fans out over a thread pool (rapidfuzz releases the GIL) and the
-    # results are reassembled in the original column/row order — output is identical to the
-    # sequential path regardless of ``config.workers``.
     ocr_page_set = set(pdf_text.ocr_pages)
 
     # Normalize each page's text ONCE for the whole run. The normalization depends only on
@@ -107,8 +120,17 @@ def run(config: RunConfig) -> RunResult:
         for col_idx, cd in enumerate(column_data)
         for row_num, value in cd.cells
     ]
+    total_values = len(tasks)
+    if progress:
+        progress("match", 0, total_values)  # announce the stage even before the first result
+
+    # A lock-guarded counter so progress still advances monotonically (1, 2, ... total) even
+    # when matches complete out of order across worker threads.
+    matched = 0
+    progress_lock = threading.Lock()
 
     def _match_task(task: tuple[int, int, object]):
+        nonlocal matched
         col_idx, row_num, value = task
         mr = match_value(
             value,
@@ -123,9 +145,14 @@ def run(config: RunConfig) -> RunResult:
         )
         if mr.page is not None:
             mr.source = "OCR" if mr.page in ocr_page_set else "text"
+        if progress:
+            with progress_lock:
+                matched += 1
+                done = matched
+            progress("match", done, total_values)
         return col_idx, mr
 
-    workers = resolve_workers(config.workers, len(tasks))
+    workers = resolve_workers(config.workers, total_values)
     columns = [ColumnResult(name=cd.name) for cd in column_data]
     for col_idx, mr in ordered_map(_match_task, tasks, workers=workers):
         columns[col_idx].results.append(mr)

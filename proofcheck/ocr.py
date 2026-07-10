@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 
 # ---- Optional imports — the feature degrades gracefully when any are absent. -----
@@ -384,6 +385,7 @@ def ocr_pages(
     psm: int = DEFAULT_PSM,
     oem: int = DEFAULT_OEM,
     workers: int = 0,
+    progress: Callable[[int, int], None] | None = None,
 ) -> dict[int, str]:
     """Render and OCR the given 1-based ``page_numbers`` of the PDF at ``path``.
 
@@ -393,8 +395,10 @@ def ocr_pages(
     ``workers`` controls parallelism (0 = auto, 1 = sequential). Pages are *rendered*
     sequentially in this thread — a single pdfium document is not safe to render from many
     threads at once — and then the slow part, Tesseract OCR, runs in parallel. To keep peak
-    memory bounded we render and OCR in chunks of ``workers`` pages rather than rendering
-    every page up front. Per-page results are pure, so output is identical to sequential.
+    memory bounded we render and OCR in chunks of ``workers`` pages rather than rendering every
+    page up front. Per-page results are pure, so output is identical to sequential. ``progress``
+    is an optional ``(done, total)`` observer called as each page is OCR'd (``total`` counts the
+    valid, in-range target pages), so a caller can render OCR progress.
     """
     from .concurrency import ordered_map, resolve_workers
 
@@ -410,7 +414,9 @@ def ocr_pages(
     try:
         page_count = len(document)
         targets = [p for p in page_numbers if 1 <= p <= page_count]
-        n_workers = resolve_workers(workers, len(targets))
+        total = len(targets)
+        n_workers = resolve_workers(workers, total)
+        done = 0
 
         def _ocr_rendered(item: tuple[int, object]) -> tuple[int, str]:
             page_number, image = item
@@ -421,7 +427,7 @@ def ocr_pages(
             return page_number, text or ""
 
         # Chunk so at most ``n_workers`` rendered page images are held in memory at once.
-        for start in range(0, len(targets), max(1, n_workers)):
+        for start in range(0, total, max(1, n_workers)):
             chunk = targets[start:start + max(1, n_workers)]
             rendered: list[tuple[int, object]] = []
             for page_number in chunk:
@@ -431,6 +437,9 @@ def ocr_pages(
                     raise OcrError(f"OCR failed on page {page_number}: {exc}") from exc
             for page_number, text in ordered_map(_ocr_rendered, rendered, workers=n_workers):
                 out[page_number] = text
+                done += 1
+                if progress:
+                    progress(done, total)
     finally:
         document.close()
 

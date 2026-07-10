@@ -21,6 +21,7 @@ skipped exactly as before. We still never *guess* — OCR only recovers real gly
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 try:  # PDFium is the fast primary engine; pdfplumber is the fallback below.
@@ -81,12 +82,15 @@ def _normalize_newlines(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _extract_pages_pdfium(path: str) -> dict[int, str]:
+def _extract_pages_pdfium(
+    path: str, progress: Callable[[int, int], None] | None = None
+) -> dict[int, str]:
     """Extract the text layer of every page with PDFium. Fast, and robust on image-heavy PDFs."""
     out: dict[int, str] = {}
     document = _pdfium.PdfDocument(path)
     try:
-        for i in range(len(document)):
+        total = len(document)
+        for i in range(total):
             page = document[i]
             textpage = page.get_textpage()
             try:
@@ -95,19 +99,27 @@ def _extract_pages_pdfium(path: str) -> dict[int, str]:
                 textpage.close()
                 page.close()
             out[i + 1] = _normalize_newlines(text)
+            if progress:
+                progress(i + 1, total)
     finally:
         document.close()
     return out
 
 
-def _extract_pages_pdfplumber(path: str) -> dict[int, str]:
+def _extract_pages_pdfplumber(
+    path: str, progress: Callable[[int, int], None] | None = None
+) -> dict[int, str]:
     """Extract the text layer of every page with pdfplumber (pdfminer). The fallback engine."""
     import pdfplumber
 
     out: dict[int, str] = {}
     with pdfplumber.open(path) as pdf:
-        for i, page in enumerate(pdf.pages, start=1):
+        pages = pdf.pages
+        total = len(pages)
+        for i, page in enumerate(pages, start=1):
             out[i] = _normalize_newlines(page.extract_text() or "")
+            if progress:
+                progress(i, total)
     return out
 
 
@@ -131,6 +143,7 @@ def extract(
     ocr_psm: int = 6,
     use_cache: bool = True,
     workers: int = 0,
+    progress: Callable[[int, int], None] | None = None,
 ) -> PdfText:
     """Extract text from every page of the PDF at ``path``.
 
@@ -139,19 +152,20 @@ def extract(
     With ``ocr=True``, pages that have no embedded text layer are OCR'd as a fallback (when the
     optional OCR support is installed); otherwise they are reported as empty. ``use_cache=False``
     forces a fresh OCR even if a cached result exists. ``workers`` controls how many pages are
-    OCR'd in parallel (0 = auto, 1 = sequential).
+    OCR'd in parallel (0 = auto, 1 = sequential). ``progress`` is an optional ``(done, total)``
+    observer notified as text-layer pages and then OCR pages complete.
     """
     engine = _resolve_engine()
     try:
         if engine == "pdfium":
-            pages = _extract_pages_pdfium(path)
+            pages = _extract_pages_pdfium(path, progress)
         else:
-            pages = _extract_pages_pdfplumber(path)
+            pages = _extract_pages_pdfplumber(path, progress)
     except Exception as exc:
         # If PDFium chokes on an unusual file, retry once with pdfplumber before giving up.
         if engine == "pdfium":
             try:
-                pages = _extract_pages_pdfplumber(path)
+                pages = _extract_pages_pdfplumber(path, progress)
             except Exception as fallback_exc:
                 raise PdfError(f"Could not read PDF file: {fallback_exc}") from fallback_exc
         else:
@@ -165,13 +179,14 @@ def extract(
 
     if ocr and result.empty_pages:
         _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm,
-                   use_cache=use_cache, workers=workers)
+                   use_cache=use_cache, workers=workers, progress=progress)
 
     return result
 
 
 def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
-               use_cache: bool = True, workers: int = 0) -> None:
+               use_cache: bool = True, workers: int = 0,
+               progress: Callable[[int, int], None] | None = None) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
 
     Uses the content-addressed OCR cache first: an identical file (same bytes, dpi, lang)
@@ -189,13 +204,17 @@ def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
 
     if recovered is not None:
         result.ocr_from_cache = True  # cache hit: unchanged file, skip OCR entirely
+        if progress:
+            # No OCR ran, but the extract stage is done — report it complete so any bar fills.
+            n = len(result.empty_pages)
+            progress(n, n)
     else:
         if not ocr_mod.available():
             result.ocr_unavailable_reason = ocr_mod.unavailable_reason()
             return
         try:
             recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang,
-                                          psm=psm, workers=workers)
+                                          psm=psm, workers=workers, progress=progress)
         except ocr_mod.OcrError as exc:
             result.ocr_error = str(exc)
             return

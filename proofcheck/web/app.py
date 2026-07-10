@@ -8,6 +8,8 @@ they are written to per-request tempfiles and deleted immediately after the run.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import tempfile
 import time
@@ -16,7 +18,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import __version__, ocr, report_html, report_xlsx
@@ -334,6 +336,129 @@ async def check(
         # PII: delete uploads immediately, whether the run succeeded or failed.
         _safe_unlink(excel_path)
         _safe_unlink(pdf_path)
+
+
+def _finalize_run(result: RunResult, user: str, excel_name: str, pdf_name: str) -> dict:
+    """Write reports, persist history, and serialize — shared by /api/check and the stream."""
+    run_id = uuid.uuid4().hex
+    result.meta.excel = excel_name or result.meta.excel
+    result.meta.pdf = pdf_name or result.meta.pdf
+    report_html.write(result, str(_REPORT_DIR / f"{run_id}.html"))
+    report_xlsx.write(result, str(_REPORT_DIR / f"{run_id}.xlsx"))
+    _record_history(run_id, user, result)
+    return _serialize(result, run_id)
+
+
+def _sse(payload: dict) -> str:
+    """Encode one Server-Sent Event frame carrying a JSON object on its ``data:`` line."""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+@app.post("/api/check/stream")
+async def check_stream(
+    excel: UploadFile = File(...),  # noqa: A002
+    pdf: UploadFile = File(...),
+    columns: str = Form(""),
+    all_columns: str = Form("false"),
+    sheet: str = Form(""),
+    header_row: int = Form(1),
+    fuzzy_threshold: int = Form(90),
+    normalize_digits: str = Form("false"),
+    strip_punctuation: str = Form("false"),
+    fold_diacritics: str = Form("false"),
+    reverse: str = Form("false"),
+    ocr: str = Form("false"),  # noqa: A002
+    ocr_lang: str = Form("eng"),
+    ocr_dpi: int = Form(300),
+    ocr_psm: int = Form(6),
+    ocr_cache: str = Form("true"),
+    workers: int = Form(0),
+    user: str = Depends(auth.current_user),
+) -> StreamingResponse:
+    """Same run as ``/api/check``, but streamed as Server-Sent Events.
+
+    Emits ``{"type":"progress","stage":"extract|match","current":N,"total":M}`` frames as the
+    run advances, then a terminal ``{"type":"result","data":<CheckResponse>}`` (identical shape
+    to ``/api/check``) or ``{"type":"error","error":...}``. The frontend renders a live progress
+    bar from these. Progress is throttled server-side to whole-percent changes per stage so a
+    large spreadsheet doesn't flood the stream.
+    """
+    _cleanup_reports()
+    _validate_ext(excel.filename, EXCEL_EXTS, "Excel file")
+    pdf_ext = _validate_ext(pdf.filename, DOC_EXTS, "PDF or image file")
+
+    excel_path = await _save_upload(excel, suffix=".xlsx")
+    pdf_path = await _save_upload(pdf, suffix=pdf_ext)
+    excel_name, pdf_name = excel.filename, pdf.filename
+
+    col_list = [c.strip() for c in columns.replace("\n", ",").split(",") if c.strip()]
+    config = RunConfig(
+        excel_path=excel_path,
+        pdf_path=pdf_path,
+        columns=col_list,
+        all_columns=_parse_bool(all_columns),
+        sheet=sheet or None,
+        header_row=header_row,
+        fuzzy_threshold=fuzzy_threshold,
+        normalize_digits=_parse_bool(normalize_digits),
+        strip_punctuation=_parse_bool(strip_punctuation),
+        fold_diacritics=_parse_bool(fold_diacritics),
+        reverse=_parse_bool(reverse),
+        ocr=_parse_bool(ocr),
+        ocr_lang=ocr_lang or "eng",
+        ocr_dpi=ocr_dpi,
+        ocr_psm=ocr_psm,
+        ocr_cache=_parse_bool(ocr_cache),
+        workers=workers,
+    )
+
+    async def event_stream():
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        last = {"stage": None, "pct": -1}
+
+        def on_progress(stage: str, current: int, total: int) -> None:
+            # Called from the worker thread; hop back to the loop and throttle to whole percents.
+            if total <= 0:
+                return
+            pct = int(current * 100 / total)
+            if stage == last["stage"] and pct == last["pct"] and current < total:
+                return
+            last["stage"], last["pct"] = stage, pct
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"type": "progress", "stage": stage, "current": current, "total": total},
+            )
+
+        def work() -> None:
+            try:
+                result = pipeline_run(config, progress=on_progress)
+                payload = _finalize_run(result, user, excel_name, pdf_name)
+                loop.call_soon_threadsafe(queue.put_nowait, {"type": "result", "data": payload})
+            except PipelineError as exc:
+                loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "error": str(exc)})
+            except Exception as exc:  # noqa: BLE001 - surface as a clean stream error, never a traceback
+                loop.call_soon_threadsafe(
+                    queue.put_nowait, {"type": "error", "error": f"Unexpected error: {exc}"}
+                )
+            finally:
+                # PII: delete uploads as soon as the run is done, success or failure.
+                _safe_unlink(excel_path)
+                _safe_unlink(pdf_path)
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: stream complete
+
+        worker = loop.run_in_executor(None, work)
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield _sse(item)
+        finally:
+            await worker
+
+    headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
 
 
 @app.get("/reports/{run_id}.{ext}")
