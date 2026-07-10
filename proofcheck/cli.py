@@ -23,6 +23,44 @@ def _fail(message: str) -> None:
     sys.exit(2)
 
 
+class _ProgressBar:
+    """Render pipeline progress as a single, in-place updating line on stderr.
+
+    Consumes the ``(stage, current, total)`` events emitted by :func:`pipeline.run`. Each
+    stage ("OCR", "Matching") gets its own bar; redraws are throttled to whole-percent
+    changes so a huge sheet doesn't flood the terminal. When a stage reaches ``current ==
+    total`` the bar is completed with a "done" marker and a trailing newline, giving a
+    definite completion indication before the next stage (or the final summary) prints.
+    """
+
+    _LABELS = {"extract": "OCR", "match": "Matching"}
+    _WIDTH = 28
+
+    def __init__(self) -> None:
+        self._stage: str | None = None
+        self._last_pct = -1
+
+    def __call__(self, stage: str, current: int, total: int) -> None:
+        if total <= 0:
+            return
+        # Starting a new stage resets the throttle so its first frame always draws.
+        if stage != self._stage:
+            self._stage = stage
+            self._last_pct = -1
+        pct = int(current * 100 / total)
+        done = current >= total
+        if pct == self._last_pct and not done:
+            return
+        self._last_pct = pct
+        label = self._LABELS.get(stage, stage)
+        filled = int(self._WIDTH * current / total)
+        # ASCII bar (not unicode block glyphs) so it renders on legacy Windows consoles too.
+        bar = "#" * filled + "-" * (self._WIDTH - filled)
+        tail = "  done\n" if done else ""
+        click.echo(f"\r{label:<9}[{bar}] {current}/{total} ({pct:3d}%){tail}",
+                   nl=False, err=True)
+
+
 @click.group()
 @click.version_option(__version__, prog_name="proofcheck")
 def cli() -> None:
@@ -67,6 +105,8 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
 @click.option("--ocr-psm", default=6, show_default=True, type=click.IntRange(0, 13),
               help="Tesseract page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--no-ocr-cache", is_flag=True, help="Force fresh OCR (ignore the OCR cache).")
+@click.option("--progress/--no-progress", "progress", default=None,
+              help="Show a progress bar (default: on when stderr is a terminal).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
 @click.option("--xlsx", "xlsx_out", type=click.Path(dir_okay=False), help="Write an xlsx report here.")
 def check(
@@ -86,6 +126,7 @@ def check(
     ocr_lang: str,
     ocr_psm: int,
     no_ocr_cache: bool,
+    progress: bool | None,
     html_out: str | None,
     xlsx_out: str | None,
 ) -> None:
@@ -108,8 +149,11 @@ def check(
         ocr_psm=ocr_psm,
         ocr_cache=not no_ocr_cache,
     )
+    # Auto-enable the bar for interactive terminals; suppress it when piped or with --no-progress.
+    show_progress = sys.stderr.isatty() if progress is None else progress
+    progress_cb = _ProgressBar() if show_progress else None
     try:
-        result = pipeline_run(config)
+        result = pipeline_run(config, progress=progress_cb)
     except PipelineError as exc:
         _fail(str(exc))
 
