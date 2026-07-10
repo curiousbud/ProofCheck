@@ -88,6 +88,32 @@ def _best_snippet(needle_norm: str, haystack_raw: str, haystack_norm: str) -> st
     return haystack_raw[start:end].strip() or haystack_norm[align.dest_start:align.dest_end]
 
 
+def normalize_pages(
+    pages: dict[int, str],
+    *,
+    normalize_digits: bool = False,
+    strip_punctuation: bool = False,
+    fold_diacritics: bool = False,
+) -> dict[int, str]:
+    """Pre-normalize every page's text once, for reuse across many :func:`match_value` calls.
+
+    Page normalization depends only on the run-wide flags, not on the expected value, so
+    it is identical for every value checked in a run. Computing it once here and passing
+    the result into ``match_value(..., pages_norm=...)`` avoids re-normalizing the full text
+    of every page for every single value — the difference between a run finishing in
+    seconds and one that appears to hang on a large spreadsheet + multi-page PDF.
+    """
+    return {
+        page_num: normalize(
+            raw,
+            normalize_digits=normalize_digits,
+            strip_punctuation=strip_punctuation,
+            fold_diacritics=fold_diacritics,
+        )
+        for page_num, raw in pages.items()
+    }
+
+
 def match_value(
     expected: object,
     pages: dict[int, str],
@@ -98,8 +124,15 @@ def match_value(
     fold_diacritics: bool = False,
     reverse: bool = False,
     row: int = 0,
+    pages_norm: dict[int, str] | None = None,
 ) -> MatchResult:
-    """Match a single expected value against all PDF pages."""
+    """Match a single expected value against all PDF pages.
+
+    ``pages_norm`` is an optional map of ``{page_num: normalized_text}`` produced by
+    :func:`normalize_pages` with the same flags. When supplied it is reused verbatim so the
+    expensive page normalization runs once per run instead of once per value; when omitted
+    (e.g. a standalone/test call) each page is normalized inline as before.
+    """
     if _is_blank(expected):
         return MatchResult(row=row, expected="" if expected is None else str(expected),
                             status=Status.SKIPPED)
@@ -127,7 +160,7 @@ def match_value(
     dup_snippet = ""  # raw PDF text of the name INCLUDING the duplicated word
 
     for page_num, raw in pages.items():
-        hay = normalize(raw, **norm_kwargs)
+        hay = pages_norm[page_num] if pages_norm is not None else normalize(raw, **norm_kwargs)
         if not hay:
             continue
         for cand in needles:
