@@ -85,11 +85,17 @@ def extract(
     result = PdfText()
     try:
         with pdfplumber.open(path) as pdf:
-            for i, page in enumerate(pdf.pages, start=1):
+            pages = pdf.pages
+            total = len(pages)
+            for i, page in enumerate(pages, start=1):
                 text = page.extract_text() or ""
                 result.pages[i] = text
                 if not text.strip():
                     result.empty_pages.append(i)
+                # Text-layer extraction is the slow phase on big/scanned PDFs, so report it
+                # under the same "extract" stage as OCR — the bar reflects real work either way.
+                if progress:
+                    progress(i, total)
     except PdfError:
         raise
     except Exception as exc:

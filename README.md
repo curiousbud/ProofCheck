@@ -298,10 +298,11 @@ Tune accuracy with `--ocr-dpi` (raise for small text) and `--ocr-psm` (page layo
 e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300), `--ocr-psm` (page layout),
 `--no-ocr-cache` (force fresh OCR, ignore the cache for this run).
 
-**Progress:** `check` shows a live progress bar on stderr for the OCR and matching stages,
-each ending in a definite `done` marker, so long runs report how far along they are instead
-of looking hung. It is on automatically for an interactive terminal and suppressed when
-stderr is piped/redirected; force it either way with `--progress` / `--no-progress`.
+**Progress:** `check` shows a live progress bar on stderr for the extraction (text-layer +
+OCR) and matching stages, each ending in a definite `done` marker, so long runs report how
+far along they are instead of looking hung. It is on automatically for an interactive
+terminal and suppressed when stderr is piped/redirected; force it either way with
+`--progress` / `--no-progress`.
 
 ### Status meanings & colors
 

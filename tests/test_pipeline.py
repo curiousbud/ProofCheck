@@ -75,6 +75,19 @@ def test_progress_reports_match_completion(excel_path, pdf_path):
     assert currents[-1] == total
 
 
+def test_progress_reports_extract_stage(excel_path, pdf_path):
+    """Text-layer extraction (the slow phase on big PDFs) must emit 'extract' progress."""
+    events = []
+    config = RunConfig(excel_path=excel_path, pdf_path=pdf_path, columns=["Name"], sheet="Delegates")
+    run(config, progress=lambda stage, cur, tot: events.append((stage, cur, tot)))
+
+    extract_events = [(cur, tot) for stage, cur, tot in events if stage == "extract"]
+    assert extract_events, "expected extract progress for the text-layer pass"
+    # The fixture PDF has 2 pages; extraction should walk both and finish at total/total.
+    assert extract_events[-1] == (2, 2)
+    assert all(tot == 2 for _, tot in extract_events)
+
+
 def test_progress_is_optional(excel_path, pdf_path):
     """A run without a progress callback behaves exactly as before (no crash, same result)."""
     config = RunConfig(excel_path=excel_path, pdf_path=pdf_path, columns=["Name"], sheet="Delegates")
