@@ -88,11 +88,13 @@ def _extract_pages_pdfium(path: str) -> dict[int, str]:
     try:
         for i in range(len(document)):
             page = document[i]
-            textpage = page.get_textpage()
             try:
-                text = textpage.get_text_range() or ""
+                textpage = page.get_textpage()
+                try:
+                    text = textpage.get_text_range() or ""
+                finally:
+                    textpage.close()
             finally:
-                textpage.close()
                 page.close()
             out[i + 1] = _normalize_newlines(text)
     finally:
