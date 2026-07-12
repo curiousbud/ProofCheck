@@ -9,6 +9,7 @@ door open for a future background-job runner (arq/RQ) to call it unchanged.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from . import document, excel, pdf
 from .matcher import match_value
@@ -20,6 +21,13 @@ from .models import (
     Status,
     Summary,
 )
+
+# Progress callback: ``progress(stage, current, total)`` where ``stage`` is "extract"
+# (OCR of no-text-layer pages) or "match" (checking values), and ``current``/``total`` are
+# unit counts. It is called with ``current == total`` when a stage finishes, so a renderer
+# can show a definite 100%/done state. Purely observational — it never affects the result,
+# so a run with no callback behaves exactly as before.
+ProgressFn = Callable[[str, int, int], None]
 
 
 class PipelineError(Exception):
@@ -44,8 +52,13 @@ def _summarize(columns: list[ColumnResult]) -> Summary:
     return summary
 
 
-def run(config: RunConfig) -> RunResult:
-    """Execute one check run and return a fully-assembled :class:`RunResult`."""
+def run(config: RunConfig, *, progress: ProgressFn | None = None) -> RunResult:
+    """Execute one check run and return a fully-assembled :class:`RunResult`.
+
+    ``progress`` is an optional observer (see :data:`ProgressFn`) notified as the OCR and
+    matching stages advance, so a caller (e.g. the CLI) can render a progress bar. It has no
+    effect on the result.
+    """
     if not config.all_columns and not config.columns:
         raise PipelineError("No columns selected. Pass column names or enable all-columns.")
 
@@ -65,6 +78,8 @@ def run(config: RunConfig) -> RunResult:
         raise PipelineError("No columns to check were found on the sheet.")
 
     # 2. Extract page text from the input (PDF text layer, or OCR for image input).
+    # OCR is the slow stage, so it reports per-page progress under the "extract" stage.
+    ocr_progress = (lambda done, total: progress("extract", done, total)) if progress else None
     try:
         pdf_text = document.extract(
             config.pdf_path,
@@ -73,6 +88,7 @@ def run(config: RunConfig) -> RunResult:
             ocr_lang=config.ocr_lang,
             ocr_psm=config.ocr_psm,
             use_cache=config.ocr_cache,
+            progress=ocr_progress,
         )
     except pdf.PdfError as exc:
         raise PipelineError(str(exc)) from exc
@@ -81,6 +97,12 @@ def run(config: RunConfig) -> RunResult:
     # Pages recovered via OCR, so each match can report whether it came from the embedded
     # text layer or from OCR.
     ocr_page_set = set(pdf_text.ocr_pages)
+    total_values = sum(len(cd.cells) for cd in column_data)
+    if progress:
+        try:
+            progress("match", 0, total_values)  # announce the stage even before the first result
+        except Exception:
+            pass
     columns: list[ColumnResult] = []
     for cd in column_data:
         col_result = ColumnResult(name=cd.name)
@@ -98,6 +120,12 @@ def run(config: RunConfig) -> RunResult:
             if mr.page is not None:
                 mr.source = "OCR" if mr.page in ocr_page_set else "text"
             col_result.results.append(mr)
+            matched += 1
+            if progress:
+                try:
+                    progress("match", matched, total_values)
+                except Exception:
+                    pass
         columns.append(col_result)
 
     # 4. Assemble the result.
