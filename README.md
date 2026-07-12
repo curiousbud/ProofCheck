@@ -116,6 +116,10 @@ All normalization is deterministic and applied to both sides before comparison:
 - Drag-free workflow: pick the Excel → it auto-loads sheets/columns into a picker → pick the
   PDF → tune flags/threshold → run. Results are filterable by status and searchable, with
   inline diff highlighting and one-click report downloads.
+- **Live progress bar.** The check streams progress over Server-Sent Events (`/api/check/stream`),
+  so instead of a spinner that could look hung, a labelled bar shows the extraction and matching
+  stages advancing and finishing — useful on large/scanned PDFs. It reuses the same pipeline
+  progress the CLI bar does; `/api/check` remains for a plain one-shot JSON response.
 - Re-uploading an **edited file** re-reads it automatically (no page refresh needed), and your
   column selection is preserved across re-inspects.
 - **Dark / light mode** toggle in the header (remembers your choice; follows the OS preference
@@ -302,6 +306,12 @@ Tune accuracy with `--ocr-dpi` (raise for small text) and `--ocr-psm` (page layo
 **OCR flags:** `--ocr` (OCR pages with no text layer), `--ocr-lang` (Tesseract language(s),
 e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300), `--ocr-psm` (page layout),
 `--no-ocr-cache` (force fresh OCR, ignore the cache for this run).
+
+**Progress:** `check` shows a live progress bar on stderr for the extraction (text-layer +
+OCR) and matching stages, each ending in a definite `done` marker, so long runs report how
+far along they are instead of looking hung. It is on automatically for an interactive
+terminal and suppressed when stderr is piped/redirected; force it either way with
+`--progress` / `--no-progress`.
 
 ### Status meanings & colors
 

@@ -13,6 +13,7 @@ images that are new or changed.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from .pdf import PdfText
 
@@ -49,10 +50,12 @@ def list_images(path: str) -> list[str]:
 
 
 def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
-            use_cache: bool = True) -> PdfText:
+            use_cache: bool = True,
+            progress: Callable[[int, int], None] | None = None) -> PdfText:
     """Build a :class:`PdfText` by OCR'ing the image(s) at ``path`` (file or directory).
 
-    ``use_cache=False`` forces a fresh OCR of every image even if cached.
+    ``use_cache=False`` forces a fresh OCR of every image even if cached. ``progress`` is an
+    optional ``(done, total)`` observer called after each image is processed.
     """
     from . import ocr as ocr_mod, ocr_cache
 
@@ -70,6 +73,7 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
         return result
 
     use_cache = use_cache and ocr_cache.enabled()
+    total = len(files)
     all_cached = True
     for i, image_path in enumerate(files, start=1):
         digest = ocr_cache.file_sha256(image_path) if use_cache else None
@@ -90,6 +94,8 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
             result.ocr_pages.append(i)
         else:
             result.empty_pages.append(i)
+        if progress:
+            progress(i, total)
 
     result.ocr_from_cache = all_cached and bool(result.ocr_pages)
     return result
