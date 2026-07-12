@@ -99,8 +99,10 @@ def run(config: RunConfig, *, progress: ProgressFn | None = None) -> RunResult:
     ocr_page_set = set(pdf_text.ocr_pages)
     total_values = sum(len(cd.cells) for cd in column_data)
     if progress:
-        progress("match", 0, total_values)  # announce the stage even before the first result
-    matched = 0
+        try:
+            progress("match", 0, total_values)  # announce the stage even before the first result
+        except Exception:
+            pass
     columns: list[ColumnResult] = []
     for cd in column_data:
         col_result = ColumnResult(name=cd.name)
