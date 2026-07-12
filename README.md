@@ -186,8 +186,7 @@ python -m pip install -e ".[ocr]"     # + OCR helpers (still needs the Tesseract
 without reinstalling. It then shows up in the global list and runs from any directory:
 
 ```console
-$ python -m pip list | grep proofcheck
-proofcheck   0.2.0   C:\Users\you\...\ProofCheck
+$ python -m pip list | grep proofcheck    # PowerShell/CMD: python -m pip list | findstr proofcheck
 $ proofcheck --help          # works from anywhere now
 ```
 
