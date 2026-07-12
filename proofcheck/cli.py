@@ -33,7 +33,7 @@ class _ProgressBar:
     definite completion indication before the next stage (or the final summary) prints.
     """
 
-    _LABELS = {"extract": "OCR", "match": "Matching"}
+    _LABELS = {"extract": "Extract", "match": "Matching"}
     _WIDTH = 28
 
     def __init__(self) -> None:
