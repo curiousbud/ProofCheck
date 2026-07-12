@@ -68,7 +68,7 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
               help="Tesseract page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--no-ocr-cache", is_flag=True, help="Force fresh OCR (ignore the OCR cache).")
 @click.option("--workers", "-j", default=0, show_default=True, type=click.IntRange(0, 64),
-              help="Parallel workers for OCR and matching (0 = auto, 1 = sequential).")
+              help="Parallel workers for OCR and matching (0 = auto from CPU count, capped at 8; 1 = sequential).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
 @click.option("--xlsx", "xlsx_out", type=click.Path(dir_okay=False), help="Write an xlsx report here.")
 def check(
