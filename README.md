@@ -70,7 +70,7 @@ All normalization is deterministic and applied to both sides before comparison:
   (no OCR). Each page tries a few deterministic strategies but **early-exits** as soon as it
   gets a confident read, so clean pages cost a single Tesseract pass. For big multi-page PDFs,
   a lower `--ocr-dpi` is the most effective speed knob.
-- **Parallelism.** `--workers/-j` (default `0` = auto from CPU count; `1` = sequential) fans the
+- **Parallelism.** `--workers/-j` (default `0` = auto from CPU count, capped at 8; `1` = sequential) fans the
   independent per-page OCR and per-value matching out over a thread pool. It only changes *how
   fast* a run finishes, never the result: work is reassembled in input order and every unit is a
   pure function of its input, so output is byte-for-byte identical to `-j 1`.
