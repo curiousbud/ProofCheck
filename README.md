@@ -303,7 +303,7 @@ e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300), `--ocr-psm` (page layout
 `--no-ocr-cache` (force fresh OCR, ignore the cache for this run).
 
 **Performance flags:** `--workers/-j N` (parallel workers for OCR and matching; `0` = auto
-from CPU count, `1` = sequential). Output is identical regardless of the worker count.
+from CPU count, capped at 8; `1` = sequential). Output is identical regardless of the worker count.
 
 ### Status meanings & colors
 
