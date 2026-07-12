@@ -51,6 +51,11 @@ del{background:#ffd7d5;text-decoration:line-through;} ins{background:#d7f5dd;tex
 .toolbar input[type=search]{ padding:.4rem .6rem; border:1px solid var(--border); border-radius:6px; min-width:220px; }
 .spinner { display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:.5rem; }
 @keyframes spin { to { transform:rotate(360deg); } }
+/* Live check progress (SSE): a labelled bar with a definite completion state. */
+.pbar { margin:.75rem 0; }
+.pbar-label { font-size:.85rem; color:var(--muted); margin-bottom:.35rem; }
+.pbar-track { height:10px; background:var(--border); border-radius:999px; overflow:hidden; }
+.pbar-fill { height:100%; width:0; background:var(--link); border-radius:999px; transition:width .2s ease; }
 .hidden { display:none; }
 a.report, a.rowlink { color:var(--link); }
 .muted { color:var(--muted); font-size:.8rem; }

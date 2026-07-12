@@ -35,6 +35,11 @@ A complete tour of what ProofCheck does and why.
   perfect substring of the duplicated text. The check is deterministic and token-based.
 - **Pass rate** = `(exact + fuzzy) / (total − skipped)`; blank cells are excluded.
 - **Per-page location.** Each match reports the PDF page it was found on.
+- **Fast text extraction.** Text is read with **PDFium** (Chrome's PDF engine, via
+  `pypdfium2`), which stays fast even on large, image-heavy scanned PDFs where pdfminer-based
+  extraction crawls every embedded image — a 156 MB / 150-page file drops from ~19 minutes to
+  ~20 seconds. `pdfplumber` remains an automatic fallback; force it with
+  `PROOFCHECK_PDF_ENGINE=pdfplumber`. Both read the same text layer, so results are identical.
 
 ### Text normalization (toggle per run)
 All normalization is deterministic and applied to both sides before comparison:
@@ -70,6 +75,10 @@ All normalization is deterministic and applied to both sides before comparison:
   (no OCR). Each page tries a few deterministic strategies but **early-exits** as soon as it
   gets a confident read, so clean pages cost a single Tesseract pass. For big multi-page PDFs,
   a lower `--ocr-dpi` is the most effective speed knob.
+- **Parallelism.** `--workers/-j` (default `0` = auto from CPU count, capped at 8; `1` = sequential) fans the
+  independent per-page OCR and per-value matching out over a thread pool. It only changes *how
+  fast* a run finishes, never the result: work is reassembled in input order and every unit is a
+  pure function of its input, so output is byte-for-byte identical to `-j 1`.
 - **Diagnose it:** `proofcheck ocr file.pdf` shows the recovered text, **mean confidence**,
   and the winning **strategy** per page; `--save-images DIR` dumps exactly what Tesseract saw.
 - **Limits.** Tesseract is trained on ordinary document fonts. Heavily stylized **display /
@@ -111,6 +120,10 @@ All normalization is deterministic and applied to both sides before comparison:
 - Drag-free workflow: pick the Excel → it auto-loads sheets/columns into a picker → pick the
   PDF → tune flags/threshold → run. Results are filterable by status and searchable, with
   inline diff highlighting and one-click report downloads.
+- **Live progress bar.** The check streams progress over Server-Sent Events (`/api/check/stream`),
+  so instead of a spinner that could look hung, a labelled bar shows the extraction and matching
+  stages advancing and finishing — useful on large/scanned PDFs. It reuses the same pipeline
+  progress the CLI bar does; `/api/check` remains for a plain one-shot JSON response.
 - Re-uploading an **edited file** re-reads it automatically (no page refresh needed), and your
   column selection is preserved across re-inspects.
 - **Dark / light mode** toggle in the header (remembers your choice; follows the OS preference
@@ -298,6 +311,14 @@ Tune accuracy with `--ocr-dpi` (raise for small text) and `--ocr-psm` (page layo
 e.g. `eng+ara`), `--ocr-dpi` (render DPI, default 300), `--ocr-psm` (page layout),
 `--no-ocr-cache` (force fresh OCR, ignore the cache for this run).
 
+**Performance flags:** `--workers/-j N` (parallel workers for OCR and matching; `0` = auto
+from CPU count, capped at 8; `1` = sequential). Output is identical regardless of the worker count.
+**Progress:** `check` shows a live progress bar on stderr for the extraction (text-layer +
+OCR) and matching stages, each ending in a definite `done` marker, so long runs report how
+far along they are instead of looking hung. It is on automatically for an interactive
+terminal and suppressed when stderr is piped/redirected; force it either way with
+`--progress` / `--no-progress`.
+
 ### Status meanings & colors
 
 | Status    | Meaning                                   | Color |
@@ -453,7 +474,7 @@ proofcheck/
   models.py        # RunConfig / RunResult / ColumnResult / MatchResult (internal contract)
   normalize.py     # deterministic text normalization (casefold, digits, punct, diacritics)
   excel.py         # workbook load + inspect (openpyxl)
-  pdf.py           # per-page text extraction (pdfplumber) + optional OCR fallback
+  pdf.py           # per-page text extraction (PDFium, pdfplumber fallback) + optional OCR fallback
   images.py        # image / image-folder input (each image = one OCR'd page)
   document.py      # input dispatcher: routes PDFs vs images to the right extractor
   ocr.py           # OPTIONAL deterministic Tesseract OCR (graceful no-op if absent)

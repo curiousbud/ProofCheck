@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 
 # ---- Optional imports — the feature degrades gracefully when any are absent. -----
@@ -383,12 +384,17 @@ def ocr_pages(
     lang: str = DEFAULT_LANG,
     psm: int = DEFAULT_PSM,
     oem: int = DEFAULT_OEM,
+    progress: Callable[[int, int], None] | None = None,
 ) -> dict[int, str]:
     """Render and OCR the given 1-based ``page_numbers`` of the PDF at ``path``.
 
     Returns ``{page_number: extracted_text}`` using the best of several deterministic OCR
-    strategies per page. Raises :class:`OcrError` on any failure.
+    strategies per page. Raises :class:`OcrError` on any failure. ``progress`` is an optional
+    ``(done, total)`` observer called after each page is OCR'd (``total`` counts the valid,
+    in-range target pages), so a caller can render OCR progress.
     """
+    from .concurrency import ordered_map, resolve_workers
+
     if not available():
         raise OcrError(unavailable_reason() or "OCR is unavailable.")
 
@@ -400,15 +406,29 @@ def ocr_pages(
 
     try:
         page_count = len(document)
-        for page_number in page_numbers:
-            if page_number < 1 or page_number > page_count:
-                continue
+        targets = [p for p in page_numbers if 1 <= p <= page_count]
+        total = len(targets)
+        for done, page_number in enumerate(targets, start=1):
             try:
-                image = _render_page(document, page_number - 1, dpi=dpi)
                 text, _, _, _, _ = _best_ocr(image, lang=lang, psm=psm, oem=oem)
             except Exception as exc:
                 raise OcrError(f"OCR failed on page {page_number}: {exc}") from exc
+            return page_number, text or ""
+
+        # Chunk so at most ``n_workers`` rendered page images are held in memory at once.
+        for start in range(0, len(targets), max(1, n_workers)):
+            chunk = targets[start:start + max(1, n_workers)]
+            rendered: list[tuple[int, object]] = []
+            for page_number in chunk:
+                try:
+                    rendered.append((page_number, _render_page(document, page_number - 1, dpi=dpi)))
+                except Exception as exc:
+                    raise OcrError(f"OCR failed on page {page_number}: {exc}") from exc
+            for page_number, text in ordered_map(_ocr_rendered, rendered, workers=n_workers):
+                out[page_number] = text
             out[page_number] = text or ""
+            if progress:
+                progress(done, total)
     finally:
         document.close()
 

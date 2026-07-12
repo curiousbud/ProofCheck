@@ -78,6 +78,7 @@ class RunConfig:
     ocr_lang: str = "eng"             # Tesseract language pack(s), e.g. "eng" or "eng+ara"
     ocr_psm: int = 6                  # Tesseract page-segmentation mode (6 = single block)
     ocr_cache: bool = True            # reuse cached OCR for unchanged files (off = always re-OCR)
+    workers: int = 0                  # parallelism: 0 = auto (CPU-based), 1 = sequential, N = at most N
 
 
 @dataclass

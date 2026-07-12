@@ -56,6 +56,61 @@ def test_all_columns(excel_path, pdf_path):
     assert {c.name for c in result.columns} == {"Name", "CC Code", "City"}
 
 
+@pytest.mark.parametrize("workers", [1, 2, 4, 8])
+def test_workers_do_not_change_output(excel_path, pdf_path, workers):
+    """Parallelism must be transparent: any worker count yields identical results."""
+    base = run(RunConfig(
+        excel_path=excel_path, pdf_path=pdf_path,
+        all_columns=True, sheet="Delegates", reverse=True, workers=1,
+    ))
+    parallel = run(RunConfig(
+        excel_path=excel_path, pdf_path=pdf_path,
+        all_columns=True, sheet="Delegates", reverse=True, workers=workers,
+    ))
+    # Same columns, in the same order, with the same per-row results (order included).
+    assert [c.name for c in parallel.columns] == [c.name for c in base.columns]
+    for pc, bc in zip(parallel.columns, base.columns):
+        assert [(r.row, r.expected, r.status, r.page, r.score) for r in pc.results] == \
+               [(r.row, r.expected, r.status, r.page, r.score) for r in bc.results]
+    assert parallel.summary == base.summary
+def test_progress_reports_match_completion(excel_path, pdf_path):
+    """The match stage must emit monotonic progress ending exactly at (total, total)."""
+    events = []
+    config = RunConfig(excel_path=excel_path, pdf_path=pdf_path, columns=["Name"], sheet="Delegates")
+    result = run(config, progress=lambda stage, cur, tot: events.append((stage, cur, tot)))
+
+    match_events = [(cur, tot) for stage, cur, tot in events if stage == "match"]
+    assert match_events, "expected at least one match progress event"
+    total = result.summary.total
+    # Announced up front at 0, advances one per value, and finishes at total/total.
+    assert match_events[0] == (0, total)
+    assert match_events[-1] == (total, total)
+    assert all(tot == total for _, tot in match_events)
+    # current is non-decreasing and never overshoots the total.
+    currents = [cur for cur, _ in match_events]
+    assert currents == sorted(currents)
+    assert currents[-1] == total
+
+
+def test_progress_reports_extract_stage(excel_path, pdf_path):
+    """Text-layer extraction (the slow phase on big PDFs) must emit 'extract' progress."""
+    events = []
+    config = RunConfig(excel_path=excel_path, pdf_path=pdf_path, columns=["Name"], sheet="Delegates")
+    run(config, progress=lambda stage, cur, tot: events.append((stage, cur, tot)))
+
+    extract_events = [(cur, tot) for stage, cur, tot in events if stage == "extract"]
+    assert extract_events, "expected extract progress for the text-layer pass"
+    # The fixture PDF has 2 pages; extraction should walk both and finish at total/total.
+    assert extract_events[-1] == (2, 2)
+    assert all(tot == 2 for _, tot in extract_events)
+
+
+def test_progress_is_optional(excel_path, pdf_path):
+    """A run without a progress callback behaves exactly as before (no crash, same result)."""
+    config = RunConfig(excel_path=excel_path, pdf_path=pdf_path, columns=["Name"], sheet="Delegates")
+    assert run(config).summary.total == run(config, progress=None).summary.total
+
+
 def test_no_columns_raises(excel_path, pdf_path):
     with pytest.raises(PipelineError):
         run(RunConfig(excel_path=excel_path, pdf_path=pdf_path, sheet="Delegates"))
