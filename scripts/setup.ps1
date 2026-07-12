@@ -31,6 +31,41 @@ Set-Location $Root
 
 $TessDir = "C:\Program Files\Tesseract-OCR"
 
+# Last-resort fallback: download the UB-Mannheim installer and run it silently (NSIS /S).
+# Returns $true on success. Used only when no package manager (winget/choco/scoop) is present.
+function Install-TesseractFromInstaller {
+    $url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.5.0.20241111.exe"
+    $exe = Join-Path $env:TEMP "tesseract-ocr-setup.exe"
+    try {
+        Info "Downloading the Tesseract installer from UB-Mannheim..."
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+        if ($PSVersionTable.PSVersion.Major -lt 6) {
+            Invoke-WebRequest -Uri $url -OutFile $exe -UseBasicParsing
+        } else {
+            Invoke-WebRequest -Uri $url -OutFile $exe
+        }
+
+        $sig = Get-AuthenticodeSignature -FilePath $exe
+        if ($sig.Status -ne 'Valid') {
+            throw "Downloaded installer signature check failed: $($sig.Status)"
+        }
+
+        Info "Running the installer silently (this may take a minute)..."
+        $p = Start-Process -FilePath $exe -ArgumentList "/S" -Wait -PassThru
+        if ($p.ExitCode -ne 0) {
+            throw "Installer exited with code $($p.ExitCode)"
+        }
+
+        return (Test-Path "$TessDir\tesseract.exe")
+    } catch {
+        Warn "Installer download/run failed: $($_.Exception.Message)"
+        return $false
+    } finally {
+        Remove-Item $exe -ErrorAction SilentlyContinue
+    }
+}
+
 function Install-Tesseract {
     if ($SkipTesseract) { Warn "-SkipTesseract set - skipping engine install."; return }
     if (Get-Command tesseract -ErrorAction SilentlyContinue) { Info "Tesseract already on PATH."; return }
@@ -45,9 +80,11 @@ function Install-Tesseract {
     } elseif (Get-Command scoop -ErrorAction SilentlyContinue) {
         Info "Installing Tesseract via Scoop..."
         scoop install tesseract
+    } elseif (Install-TesseractFromInstaller) {
+        Info "Installed Tesseract from the UB-Mannheim installer."
     } else {
-        Warn "No winget/choco/scoop found. Install Tesseract manually from"
-        Warn "  https://github.com/UB-Mannheim/tesseract/wiki  (OCR stays disabled until then)."
+        Warn "No winget/choco/scoop found and the direct download failed. Install Tesseract manually"
+        Warn "  from https://github.com/UB-Mannheim/tesseract/wiki  (OCR stays disabled until then)."
         return
     }
 
