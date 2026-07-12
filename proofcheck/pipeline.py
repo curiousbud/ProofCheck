@@ -12,6 +12,7 @@ import os
 from collections.abc import Callable
 
 from . import document, excel, pdf
+from .matcher import match_value, normalize_pages
 from .concurrency import ordered_map, resolve_workers
 from .matcher import match_value
 from .models import (
@@ -103,6 +104,15 @@ def run(config: RunConfig, *, progress: ProgressFn | None = None) -> RunResult:
     # results are reassembled in the original column/row order — output is identical to the
     # sequential path regardless of ``config.workers``.
     ocr_page_set = set(pdf_text.ocr_pages)
+    # Normalize each page's text ONCE for the whole run. The normalization depends only on
+    # the run-wide flags, so it is identical for every value; doing it here instead of inside
+    # match_value turns an O(values x pages) pass over the full PDF text into an O(pages) one.
+    pages_norm = normalize_pages(
+        pdf_text.pages,
+        normalize_digits=config.normalize_digits,
+        strip_punctuation=config.strip_punctuation,
+        fold_diacritics=config.fold_diacritics,
+    )
 
     # Flatten to (column_index, row, value) tasks so results can be reassembled by position.
     tasks = [
@@ -150,6 +160,7 @@ def run(config: RunConfig, *, progress: ProgressFn | None = None) -> RunResult:
                 fold_diacritics=config.fold_diacritics,
                 reverse=config.reverse,
                 row=row_num,
+                pages_norm=pages_norm,
             )
             if mr.page is not None:
                 mr.source = "OCR" if mr.page in ocr_page_set else "text"
