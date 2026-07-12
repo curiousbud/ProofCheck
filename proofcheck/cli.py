@@ -105,6 +105,8 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
 @click.option("--ocr-psm", default=6, show_default=True, type=click.IntRange(0, 13),
               help="Tesseract page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--no-ocr-cache", is_flag=True, help="Force fresh OCR (ignore the OCR cache).")
+@click.option("--workers", "-j", default=0, show_default=True, type=click.IntRange(0, 64),
+              help="Parallel workers for OCR and matching (0 = auto from CPU count, capped at 8; 1 = sequential).")
 @click.option("--progress/--no-progress", "progress", default=None,
               help="Show a progress bar (default: on when stderr is a terminal).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")
@@ -126,6 +128,7 @@ def check(
     ocr_lang: str,
     ocr_psm: int,
     no_ocr_cache: bool,
+    workers: int,
     progress: bool | None,
     html_out: str | None,
     xlsx_out: str | None,
@@ -148,6 +151,7 @@ def check(
         ocr_lang=ocr_lang,
         ocr_psm=ocr_psm,
         ocr_cache=not no_ocr_cache,
+        workers=workers,
     )
     # Auto-enable the bar for interactive terminals; suppress it when piped or with --no-progress.
     show_progress = sys.stderr.isatty() if progress is None else progress

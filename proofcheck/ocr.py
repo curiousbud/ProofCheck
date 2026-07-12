@@ -393,6 +393,8 @@ def ocr_pages(
     ``(done, total)`` observer called after each page is OCR'd (``total`` counts the valid,
     in-range target pages), so a caller can render OCR progress.
     """
+    from .concurrency import ordered_map, resolve_workers
+
     if not available():
         raise OcrError(unavailable_reason() or "OCR is unavailable.")
 
@@ -408,10 +410,22 @@ def ocr_pages(
         total = len(targets)
         for done, page_number in enumerate(targets, start=1):
             try:
-                image = _render_page(document, page_number - 1, dpi=dpi)
                 text, _, _, _, _ = _best_ocr(image, lang=lang, psm=psm, oem=oem)
             except Exception as exc:
                 raise OcrError(f"OCR failed on page {page_number}: {exc}") from exc
+            return page_number, text or ""
+
+        # Chunk so at most ``n_workers`` rendered page images are held in memory at once.
+        for start in range(0, len(targets), max(1, n_workers)):
+            chunk = targets[start:start + max(1, n_workers)]
+            rendered: list[tuple[int, object]] = []
+            for page_number in chunk:
+                try:
+                    rendered.append((page_number, _render_page(document, page_number - 1, dpi=dpi)))
+                except Exception as exc:
+                    raise OcrError(f"OCR failed on page {page_number}: {exc}") from exc
+            for page_number, text in ordered_map(_ocr_rendered, rendered, workers=n_workers):
+                out[page_number] = text
             out[page_number] = text or ""
             if progress:
                 progress(done, total)

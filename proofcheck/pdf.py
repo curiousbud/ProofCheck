@@ -133,6 +133,7 @@ def extract(
     ocr_lang: str = "eng",
     ocr_psm: int = 6,
     use_cache: bool = True,
+    workers: int = 0,
     progress: Callable[[int, int], None] | None = None,
 ) -> PdfText:
     """Extract text from every page of the PDF at ``path``.
@@ -144,6 +145,8 @@ def extract(
     forces a fresh OCR even if a cached result exists.
     With ``ocr=True``, pages that have no embedded text layer are OCR'd as a fallback
     (when the optional OCR support is installed); otherwise they are reported as empty.
+    ``use_cache=False`` forces a fresh OCR even if a cached result exists. ``workers``
+    controls how many pages are OCR'd in parallel (0 = auto, 1 = sequential).
     ``use_cache=False`` forces a fresh OCR even if a cached result exists. ``progress`` is an
     optional ``(done, total)`` observer notified as OCR pages complete.
     """
@@ -185,12 +188,14 @@ def extract(
 
     if ocr and result.empty_pages:
         _apply_ocr(result, path, dpi=ocr_dpi, lang=ocr_lang, psm=ocr_psm,
+                   use_cache=use_cache, workers=workers)
                    use_cache=use_cache, progress=progress)
 
     return result
 
 
 def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
+               use_cache: bool = True, workers: int = 0) -> None:
                use_cache: bool = True,
                progress: Callable[[int, int], None] | None = None) -> None:
     """Recover no-text-layer pages via OCR, mutating ``result`` in place.
@@ -220,6 +225,7 @@ def _apply_ocr(result: PdfText, path: str, *, dpi: int, lang: str, psm: int = 6,
             return
         try:
             recovered = ocr_mod.ocr_pages(path, list(result.empty_pages), dpi=dpi, lang=lang,
+                                          psm=psm, workers=workers)
                                           psm=psm, progress=progress)
         except ocr_mod.OcrError as exc:
             result.ocr_error = str(exc)

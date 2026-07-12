@@ -29,6 +29,12 @@ def extract(
     ocr_lang: str = "eng",
     ocr_psm: int = 6,
     use_cache: bool = True,
+    workers: int = 0,
+) -> PdfText:
+    """Route to the image OCR path or the PDF path based on ``path``.
+
+    ``workers`` controls OCR parallelism (0 = auto, 1 = sequential); it is inert when no
+    OCR happens (a PDF whose pages all have a text layer).
     progress: OcrProgressFn | None = None,
 ) -> PdfText:
     """Route to the image OCR path or the PDF path based on ``path``.
@@ -38,6 +44,9 @@ def extract(
     if images.is_image_input(path):
         # Images have no text layer, so OCR is implied regardless of the ``ocr`` flag.
         return images.extract(path, ocr_lang=ocr_lang, ocr_psm=ocr_psm, use_cache=use_cache,
+                              workers=workers)
+    return pdf.extract(path, ocr=ocr, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang, ocr_psm=ocr_psm,
+                       use_cache=use_cache, workers=workers)
                               progress=progress)
     return pdf.extract(path, ocr=ocr, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang, ocr_psm=ocr_psm,
                        use_cache=use_cache, progress=progress)
