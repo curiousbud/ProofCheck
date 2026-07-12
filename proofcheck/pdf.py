@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 
 try:  # PDFium is the fast primary engine; pdfplumber is the fallback below.
     import pypdfium2 as _pdfium
-except Exception:  # pragma: no cover - exercised only without the optional dep
+except Exception:  # pragma: no cover - exercised only when pypdfium2 is unavailable at runtime
     _pdfium = None
 
 
