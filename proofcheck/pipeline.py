@@ -122,7 +122,10 @@ def run(config: RunConfig, *, progress: ProgressFn | None = None) -> RunResult:
             col_result.results.append(mr)
             matched += 1
             if progress:
-                progress("match", matched, total_values)
+                try:
+                    progress("match", matched, total_values)
+                except Exception:
+                    pass
         columns.append(col_result)
 
     # 4. Assemble the result.
