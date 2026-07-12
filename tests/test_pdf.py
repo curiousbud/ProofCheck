@@ -6,7 +6,11 @@ from proofcheck.pipeline import run
 
 
 def _verdicts(result):
-    return [(r.expected, r.status, r.page, r.score) for col in result.columns for r in col.results]
+    return [
+        (r.row, r.expected, r.status, r.page, r.score, r.best_match, r.diff, r.source)
+        for col in result.columns
+        for r in col.results
+    ]
 
 
 def test_default_engine_is_pdfium_when_available(monkeypatch):
