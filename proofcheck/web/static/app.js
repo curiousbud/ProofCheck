@@ -168,11 +168,7 @@ function progressUI() {
   return {
     node,
     update(stage, current, total) {
-      const pct = total > 0 ? Math.round((current * 100) / total) : 0;
-      fill.style.width = pct + "%";
-      const name = LABELS[stage] || stage;
-      const doneTick = current >= total && total > 0 ? " ✓" : "";
-      label.textContent = `${name}: ${current} / ${total} (${pct}%)${doneTick}`;
+      const pct = total > 0 ? Math.floor((current * 100) / total) : 0;
     },
     remove() { node.remove(); },
   };
