@@ -173,7 +173,7 @@ def extract(
             try:
                 pages = _extract_pages_pdfplumber(path)
             except Exception as fallback_exc:
-                raise PdfError(f"Could not read PDF file: {fallback_exc}") from fallback_exc
+                raise PdfError(f"Could not read PDF file with PDFium ({exc}); pdfplumber fallback also failed ({fallback_exc})") from fallback_exc
         else:
             raise PdfError(f"Could not read PDF file: {exc}") from exc
 
