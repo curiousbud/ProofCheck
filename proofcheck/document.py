@@ -8,8 +8,13 @@ no text layer). Both return the same :class:`~proofcheck.pdf.PdfText`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from . import images, pdf
 from .pdf import PdfError, PdfText
+
+# OCR progress observer: ``progress(pages_done, pages_total)``. Reported only while OCR runs.
+OcrProgressFn = Callable[[int, int], None]
 
 
 def is_image_input(path: str) -> bool:
@@ -30,6 +35,11 @@ def extract(
 
     ``workers`` controls OCR parallelism (0 = auto, 1 = sequential); it is inert when no
     OCR happens (a PDF whose pages all have a text layer).
+    progress: OcrProgressFn | None = None,
+) -> PdfText:
+    """Route to the image OCR path or the PDF path based on ``path``.
+
+    ``progress`` is an optional ``(done, total)`` observer notified as OCR pages complete.
     """
     if images.is_image_input(path):
         # Images have no text layer, so OCR is implied regardless of the ``ocr`` flag.
@@ -37,6 +47,9 @@ def extract(
                               workers=workers)
     return pdf.extract(path, ocr=ocr, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang, ocr_psm=ocr_psm,
                        use_cache=use_cache, workers=workers)
+                              progress=progress)
+    return pdf.extract(path, ocr=ocr, ocr_dpi=ocr_dpi, ocr_lang=ocr_lang, ocr_psm=ocr_psm,
+                       use_cache=use_cache, progress=progress)
 
 
 __all__ = ["extract", "is_image_input", "PdfError", "PdfText"]

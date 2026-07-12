@@ -13,6 +13,7 @@ images that are new or changed.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from .pdf import PdfText
 
@@ -56,6 +57,12 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
     controls how many images are OCR'd in parallel (0 = auto, 1 = sequential); each image is
     an independent page, so results are reassembled in filename order and are identical to
     the sequential path.
+            use_cache: bool = True,
+            progress: Callable[[int, int], None] | None = None) -> PdfText:
+    """Build a :class:`PdfText` by OCR'ing the image(s) at ``path`` (file or directory).
+
+    ``use_cache=False`` forces a fresh OCR of every image even if cached. ``progress`` is an
+    optional ``(done, total)`` observer called after each image is processed.
     """
     from . import ocr as ocr_mod, ocr_cache
     from .concurrency import ordered_map, resolve_workers
@@ -82,6 +89,9 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
         shared result in order so the parallel path stays deterministic.
         """
         i, image_path = item
+    total = len(files)
+    all_cached = True
+    for i, image_path in enumerate(files, start=1):
         digest = ocr_cache.file_sha256(image_path) if use_cache else None
         cached = ocr_cache.load(digest, dpi=0, lang=ocr_lang, psm=ocr_psm) if digest else None
         if cached is not None and 1 in cached:
@@ -110,6 +120,8 @@ def extract(path: str, *, ocr_lang: str = "eng", ocr_psm: int = 6,
             result.ocr_pages.append(i)
         else:
             result.empty_pages.append(i)
+        if progress:
+            progress(i, total)
 
     result.ocr_from_cache = all_cached and bool(result.ocr_pages)
     return result

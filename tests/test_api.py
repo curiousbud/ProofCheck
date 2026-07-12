@@ -1,4 +1,5 @@
 import io
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -74,6 +75,57 @@ def test_check_returns_documented_shape_and_counts(excel_path, pdf_path):
     html_res = client.get(data["report_urls"]["html"])
     assert html_res.status_code == 200
     assert "ProofCheck results" in html_res.text
+
+
+def _parse_sse(text):
+    """Parse an SSE response body into a list of decoded JSON event objects."""
+    events = []
+    for frame in text.split("\n\n"):
+        for line in frame.split("\n"):
+            if line.startswith("data:"):
+                events.append(json.loads(line[len("data:"):].strip()))
+    return events
+
+
+def test_check_stream_emits_progress_then_result(excel_path, pdf_path):
+    res = client.post(
+        "/api/check/stream",
+        files={
+            "excel": ("delegates.xlsx", _excel_upload(excel_path), "application/octet-stream"),
+            "pdf": ("program.pdf", _pdf_upload(pdf_path), "application/pdf"),
+        },
+        data={"columns": "Name", "sheet": "Delegates", "fuzzy_threshold": "90"},
+    )
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/event-stream")
+    events = _parse_sse(res.text)
+
+    progress = [e for e in events if e["type"] == "progress"]
+    results = [e for e in events if e["type"] == "result"]
+    assert progress, "expected at least one progress event"
+    assert {e["stage"] for e in progress} <= {"extract", "match"}
+    # Exactly one terminal result frame, carrying the same shape as /api/check.
+    assert len(results) == 1
+    data = results[0]["data"]
+    assert set(data) >= {"meta", "summary", "columns", "warnings", "report_urls"}
+    s = data["summary"]
+    assert s["exact"] == 1 and s["fuzzy"] == 1 and s["missing"] == 2 and s["skipped"] == 1
+
+
+def test_check_stream_reports_error_frame(excel_path, pdf_path):
+    # No column selected and all_columns off -> pipeline raises -> error frame, not a crash.
+    res = client.post(
+        "/api/check/stream",
+        files={
+            "excel": ("delegates.xlsx", _excel_upload(excel_path), "application/octet-stream"),
+            "pdf": ("program.pdf", _pdf_upload(pdf_path), "application/pdf"),
+        },
+        data={"columns": "", "sheet": "Delegates"},
+    )
+    assert res.status_code == 200
+    events = _parse_sse(res.text)
+    errors = [e for e in events if e["type"] == "error"]
+    assert len(errors) == 1 and "column" in errors[0]["error"].lower()
 
 
 def test_bad_extension_returns_400(excel_path, pdf_path):
