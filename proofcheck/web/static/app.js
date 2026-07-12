@@ -383,7 +383,8 @@ function wireCheck() {
       });
       prog.remove();
       if (streamError) throw new Error(streamError);
-      if (result) { state.lastResult = result; renderResults(result); }
+      if (!result) throw new Error("Stream ended without a result.");
+      state.lastResult = result; renderResults(result);
     } catch (e) {
       prog.remove();
       if (e.status === 401) return redirectLogin();
