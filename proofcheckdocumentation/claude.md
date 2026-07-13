@@ -151,6 +151,7 @@ See the live, draggable version in **[`dependency-graph.html`](dependency-graph.
 Each link is a line-by-line explainer (logic, functions, key variables, dependencies).
 
 ### Core package
+
 | File | Deep-dive | Role |
 |------|-----------|------|
 | `proofcheck/__init__.py` | [proofcheck_init_EXPLAINED.md](docs/proofcheck_init_EXPLAINED.md) | Version marker |
@@ -170,6 +171,7 @@ Each link is a line-by-line explainer (logic, functions, key variables, dependen
 | `proofcheck/cli.py` | [cli_EXPLAINED.md](docs/cli_EXPLAINED.md) | CLI (check/inspect/ocr/serve) |
 
 ### Web layer
+
 | File | Deep-dive | Role |
 |------|-----------|------|
 | `proofcheck/web/__init__.py` | [web_init_EXPLAINED.md](docs/web_init_EXPLAINED.md) | Web package marker |
@@ -180,6 +182,7 @@ Each link is a line-by-line explainer (logic, functions, key variables, dependen
 | `proofcheck/web/static/` | [web_index_html_EXPLAINED.md](docs/web_index_html_EXPLAINED.md) | Disposable framework-free SPA (index.html + app.js + app.css) |
 
 ### Tests & packaging
+
 | File | Deep-dive |
 |------|-----------|
 | `tests/conftest.py` | [tests_conftest_EXPLAINED.md](docs/tests_conftest_EXPLAINED.md) |

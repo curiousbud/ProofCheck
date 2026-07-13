@@ -157,6 +157,7 @@ def write(result: RunResult, path: str) -> None:
 Builds the workbook and saves it to `path` via openpyxl's `Workbook.save`. This is the entry point the CLI and web app call.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `_flatten_diff` | `_flatten_diff(diff: list[tuple[str, str]]) -> str` | `str` | Flatten a diff into plain text using `[-del-]` / `{+ins+}` markers. |
@@ -165,6 +166,7 @@ Builds the workbook and saves it to `path` via openpyxl's `Workbook.save`. This 
 | `write` | `write(result: RunResult, path: str) -> None` | `None` | Build the workbook and save it to `path`. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `_FILLS` | Maps each `Status` to a solid `PatternFill` whose color matches the HTML/web status palette (green/amber/red/grey). |

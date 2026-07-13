@@ -15,6 +15,7 @@ OCR (render + Tesseract) is the slowest part of a run. Because OCR is determinis
   Set to `off`/`0`/`false`/`no`/empty → caching disabled.
 
 ## Functions
+
 | Name | Signature | Description |
 | --- | --- | --- |
 | `cache_dir` | `cache_dir() -> Path \| None` | Resolve dir from env, or `None` when disabled. |
