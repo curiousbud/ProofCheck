@@ -210,9 +210,8 @@ without reinstalling. It then shows up in the global list and runs from any dire
 Cross-platform alternative (works in PowerShell/cmd too):
 
 ```console
-$ python -m pip show proofcheck
-Name: proofcheck
-Location: ...
+$ python -m pip list | grep proofcheck    # PowerShell/CMD: python -m pip list | findstr proofcheck
+$ proofcheck --help          # works from anywhere now
 ```
 
 Remove it with `python -m pip uninstall proofcheck`. Drop the `-e` for a plain (copied)
