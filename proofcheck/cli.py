@@ -27,13 +27,13 @@ class _ProgressBar:
     """Render pipeline progress as a single, in-place updating line on stderr.
 
     Consumes the ``(stage, current, total)`` events emitted by :func:`pipeline.run`. Each
-    stage ("OCR", "Matching") gets its own bar; redraws are throttled to whole-percent
+    stage ("Extract", "Matching") gets its own bar; redraws are throttled to whole-percent
     changes so a huge sheet doesn't flood the terminal. When a stage reaches ``current ==
     total`` the bar is completed with a "done" marker and a trailing newline, giving a
     definite completion indication before the next stage (or the final summary) prints.
     """
 
-    _LABELS = {"extract": "OCR", "match": "Matching"}
+    _LABELS = {"extract": "Extract", "match": "Matching"}
     _WIDTH = 28
 
     def __init__(self) -> None:
@@ -106,7 +106,7 @@ def inspect(excel_path: str, sheet: str | None, header_row: int) -> None:
               help="Tesseract page-segmentation mode (6=block, 3=auto, 4=columns, 11=sparse).")
 @click.option("--no-ocr-cache", is_flag=True, help="Force fresh OCR (ignore the OCR cache).")
 @click.option("--workers", "-j", default=0, show_default=True, type=click.IntRange(0, 64),
-              help="Parallel workers for OCR and matching (0 = auto, 1 = sequential).")
+              help="Parallel workers for OCR and matching (0 = auto from CPU count, capped at 8; 1 = sequential).")
 @click.option("--progress/--no-progress", "progress", default=None,
               help="Show a progress bar (default: on when stderr is a terminal).")
 @click.option("--html", "html_out", type=click.Path(dir_okay=False), help="Write an HTML report here.")

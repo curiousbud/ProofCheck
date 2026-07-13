@@ -168,7 +168,7 @@ function progressUI() {
   return {
     node,
     update(stage, current, total) {
-      const pct = total > 0 ? Math.round((current * 100) / total) : 0;
+      const pct = total > 0 ? Math.floor((current * 100) / total) : 0;
       fill.style.width = pct + "%";
       const name = LABELS[stage] || stage;
       const doneTick = current >= total && total > 0 ? " ✓" : "";
@@ -387,7 +387,8 @@ function wireCheck() {
       });
       prog.remove();
       if (streamError) throw new Error(streamError);
-      if (result) { state.lastResult = result; renderResults(result); }
+      if (!result) throw new Error("Stream ended without a result.");
+      state.lastResult = result; renderResults(result);
     } catch (e) {
       prog.remove();
       if (e.status === 401) return redirectLogin();
