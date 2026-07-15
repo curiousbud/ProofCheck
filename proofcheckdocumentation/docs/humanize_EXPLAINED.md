@@ -21,6 +21,7 @@ Non-technical readers find `EXACT`/`FUZZY`/`MISSING`/`SKIPPED` and raw fuzzy sco
 | `SKIPPED` | Blank | – | The spreadsheet cell was empty. |
 
 ## Functions
+
 | Name | Signature | Description |
 | --- | --- | --- |
 | `label` / `icon` / `meaning` | `(status) -> str` | The three `LABELS` fields. |

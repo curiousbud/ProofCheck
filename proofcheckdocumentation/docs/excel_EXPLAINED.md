@@ -179,6 +179,7 @@ Pre-creates one `ColumnData` per selected column and a name→object map for fas
 Iterates data rows starting just below the header. `enumerate(..., start=header_row + 1)` makes `row_num` the true 1-based spreadsheet row. For each selected column it reads the value at that column's index, guarding against short/ragged rows (`col_idx < len(row)` else `None`), and appends `(row_num, value)` to the matching `ColumnData`. The `finally` closes the workbook.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `ExcelError` | `class ExcelError(Exception)` | — | User-facing spreadsheet error type. |
@@ -190,6 +191,7 @@ Iterates data rows starting just below the header. `enumerate(..., start=header_
 | `load_columns` | `load_columns(path: str, *, sheet=None, header_row=1, columns=None, all_columns=False)` | `list[ColumnData]` | Extracts selected columns' values keyed by 1-based row number. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `header_index` | Maps header name -> 0-based column index; first occurrence wins on duplicates. |

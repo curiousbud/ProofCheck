@@ -28,11 +28,13 @@ __version__ = "0.1.0"
 Defines the package version string following semantic-versioning style (`MAJOR.MINOR.PATCH`). `__version__` is the conventional attribute tools and humans read to identify the installed release; here it is hard-coded rather than derived from packaging metadata.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | — | — | — | This file defines no functions, methods, or classes. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `__version__` | Package version string (`"0.1.0"`), the canonical value other code/tooling reads to identify the release. |

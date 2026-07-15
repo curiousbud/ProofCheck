@@ -41,6 +41,7 @@ Runs an idempotent `CREATE TABLE IF NOT EXISTS` script for `users` and `runs` pl
 - `delete_run(run_id, username)` deletes by owner and returns whether a row was removed (`rowcount > 0`).
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `db_path` | `db_path() -> Path` | `Path` | DB file path from `$PROOFCHECK_DB` (or tempdir default). |

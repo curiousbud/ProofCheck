@@ -11,6 +11,7 @@ ProofCheck originally accepted only PDFs. This module lets the *same* run work o
 - **Used by:** `proofcheck/document.py` (the dispatcher) and the CLI (`check` / `ocr`).
 
 ## Functions
+
 | Name | Signature | Description |
 | --- | --- | --- |
 | `is_image_file` | `(path) -> bool` | File with a supported image extension. |

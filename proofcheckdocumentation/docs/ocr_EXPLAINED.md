@@ -15,6 +15,7 @@ By default ProofCheck only reads a PDF's embedded text layer; scanned/image-only
   - `proofcheck/web/app.py` — `/api/health` reports `ocr.available()` so the SPA can show OCR readiness.
 
 ## Configuration constants
+
 | Name | Value | Purpose |
 | --- | --- | --- |
 | `DEFAULT_DPI` | `300` | Conventional Tesseract accuracy sweet spot for rendered pages. |
@@ -70,6 +71,7 @@ text = _pytesseract.image_to_string(image, lang=lang)
 The single public workhorse. It guards on `available()`, computes the render scale from DPI, opens the document once, and for each requested **1-based** page renders it to a PIL image and OCRs it. Out-of-range page numbers are skipped (not errors). Per-page failures are wrapped in `OcrError` (with `from exc`); the document is always closed in a `finally`. Returns `{page_number: text}`. Determinism comes from the fixed render scale + Tesseract's non-stochastic default engine.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `OcrError` | `class OcrError(Exception)` | — | User-facing OCR error type. |

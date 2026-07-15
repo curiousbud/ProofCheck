@@ -88,6 +88,7 @@ The single public function. It creates an empty `PdfText`, opens the PDF in a co
 Error handling: a `PdfError` raised inside is re-raised unchanged (`except PdfError: raise`), so an explicit PdfError isn't double-wrapped; any other exception (corrupt file, unreadable path, pdfplumber internals) is wrapped into a user-facing `PdfError` preserving the cause via `from exc`. The populated `result` is returned on success.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `PdfError` | `class PdfError(Exception)` | — | User-facing PDF error type (unreadable/corrupt file). |
@@ -97,6 +98,7 @@ Error handling: a `PdfError` raised inside is re-raised unchanged (`except PdfEr
 | `extract` | `extract(path: str) -> PdfText` | `PdfText` | Extracts the text layer of every page; records empty pages. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `result` | The `PdfText` instance accumulated and returned by `extract`. |

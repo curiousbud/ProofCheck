@@ -159,6 +159,7 @@ def write(result: RunResult, path: str) -> None:
 Thin wrapper that renders the document and writes it to `path` as UTF-8 (matching the `<meta charset='utf-8'>` declared in the markup). This is the function the CLI and web app call.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `_diff_html` | `_diff_html(diff: list[tuple[str, str]]) -> str` | `str` | Render a list of `(op, text)` diff ops as escaped HTML using `<del>`/`<ins>` tags. |
@@ -166,6 +167,7 @@ Thin wrapper that renders the document and writes it to `path` as UTF-8 (matchin
 | `write` | `write(result: RunResult, path: str) -> None` | `None` | Render the report and write it to `path` as UTF-8. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `_STATUS_CLASS` | Maps each `Status` enum member to its CSS class name (`exact`/`fuzzy`/`missing`/`skipped`), linking status to badge color. |

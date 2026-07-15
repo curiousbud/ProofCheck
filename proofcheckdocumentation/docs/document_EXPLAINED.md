@@ -13,6 +13,7 @@ images, and to the **PDF** path (`pdf.extract`) otherwise. Both return the same
 - **Used by:** `proofcheck/pipeline.py` (calls `document.extract` instead of `pdf.extract`).
 
 ## Functions
+
 | Name | Signature | Description |
 | --- | --- | --- |
 | `is_image_input` | `(path) -> bool` | True for an image file or a directory of images. |

@@ -105,6 +105,7 @@ def reverse_words(text: str) -> str:
 Splits on whitespace (`text.split()` with no args splits on any whitespace and drops empties), reverses the resulting token list, and rejoins with single spaces. Supports the `reverse` matching flag so a name like "John Smith" can also match "Smith John".
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `fold_digits` | `fold_digits(text: str) -> str` | `str` | Maps every Unicode decimal digit to its ASCII `0`–`9` equivalent; non-digits unchanged. |
@@ -113,6 +114,7 @@ Splits on whitespace (`text.split()` with no args splits on any whitespace and d
 | `reverse_words` | `reverse_words(text: str) -> str` | `str` | Reverses word order, joining tokens with single spaces. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `_WS_RE` | Module-level compiled regex `\s+` used to collapse any run of Unicode whitespace into a single ASCII space. |

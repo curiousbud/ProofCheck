@@ -6,6 +6,7 @@
 Adds user authentication to the web layer **without any external identity provider or extra dependency** — classic crypto from `hashlib`/`hmac`, nothing AI/ML. It is deliberately opt-in: disabled by default so the CLI flow and the disposable single-user SPA keep working with zero configuration (and the existing test-suite stays green). When enabled, it gates the protected API routes and attributes run history to the logged-in user. All auth lives here in `web/`; the core engine and `pipeline.run()` are untouched.
 
 ## Configuration (all via environment)
+
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PROOFCHECK_AUTH` | off | `on` enables auth gating. |
@@ -54,6 +55,7 @@ The single gate used across protected routes. **Auth off → everyone is `anonym
 - `bootstrap_admin()` seeds the env-configured admin on startup **only when auth is on and the users table is empty**.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `auth_enabled` / `registration_enabled` | `() -> bool` | `bool` | Env-driven feature flags (read fresh). |

@@ -152,6 +152,7 @@ class RunResult:
 The top-level, self-describing output of a run. Requires a `Meta` and a `Summary`; carries the list of `ColumnResult`s and any `warnings` strings (both default to per-instance empty lists). This is the single object the pipeline returns and every renderer consumes.
 
 ## Functions / Methods / Classes
+
 | Name | Signature | Returns | Description |
 | --- | --- | --- | --- |
 | `Status` | `class Status(str, Enum)` | — | String-backed enum of match outcomes: `EXACT`, `FUZZY`, `MISSING`, `SKIPPED`. |
@@ -164,6 +165,7 @@ The top-level, self-describing output of a run. Requires a `Meta` and a `Summary
 | `RunResult` | `@dataclass RunResult(meta, summary, columns=[], warnings=[])` | — | Complete self-describing run result. |
 
 ## Key variables / constants
+
 | Name | Purpose |
 | --- | --- |
 | `DiffOp` | Type alias `tuple[str, str]` = `(op, text)` describing one diff operation (`equal`/`insert`/`delete`/`replace`). |
